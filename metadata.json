@@ -1,0 +1,6 @@
+{
+  "name": "Drizzle Dental Clinic",
+  "description": "Modern dental appointment booking website with Admin/Staff approval dashboard, Dentist clinical records, Patient portal, and Google Apps Script & Sheets integration.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
