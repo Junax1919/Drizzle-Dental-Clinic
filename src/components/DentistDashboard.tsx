@@ -13,8 +13,11 @@ import {
   Search, 
   ShieldCheck,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  RefreshCw,
+  FileSpreadsheet
 } from 'lucide-react';
+import { RealTimeClockBadge } from './RealTimeClockBadge';
 
 interface DentistDashboardProps {
   dentists: Dentist[];
@@ -22,6 +25,9 @@ interface DentistDashboardProps {
   patients: Patient[];
   onCompleteAppointment: (appointmentId: string, clinicalNotes?: string) => void;
   onUpdatePatientHistory: (patientId: string, note: string) => void;
+  isSyncingSheets?: boolean;
+  onSyncWithGoogleSheets?: () => void;
+  lastSyncTime?: string;
 }
 
 export const DentistDashboard: React.FC<DentistDashboardProps> = ({
@@ -30,9 +36,12 @@ export const DentistDashboard: React.FC<DentistDashboardProps> = ({
   patients,
   onCompleteAppointment,
   onUpdatePatientHistory,
+  isSyncingSheets = false,
+  onSyncWithGoogleSheets,
+  lastSyncTime = 'Just now',
 }) => {
-  const [selectedDentistId, setSelectedDentistId] = useState<string>(dentists[1]?.id || dentists[0]?.id);
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[0]?.id);
+  const [selectedDentistId, setSelectedDentistId] = useState<string>(dentists[0]?.id || 'doc-1');
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[0]?.id || '');
   const [clinicalNoteInput, setClinicalNoteInput] = useState('');
   const [prescriptionInput, setPrescriptionInput] = useState('');
   const [treatmentSuccessMsg, setTreatmentSuccessMsg] = useState<string | null>(null);
@@ -40,9 +49,15 @@ export const DentistDashboard: React.FC<DentistDashboardProps> = ({
   const currentDentist = dentists.find((d) => d.id === selectedDentistId) || dentists[0];
   const selectedPatient = patients.find((p) => p.id === selectedPatientId) || patients[0];
 
-  // Dentist's assigned appointments
-  const dentistAppointments = appointments.filter((a) => a.dentistId === selectedDentistId);
-  const patientPastAppointments = appointments.filter((a) => a.patientName === selectedPatient.name);
+  // Dentist's assigned appointments (matching ID or doctor name)
+  const dentistAppointments = appointments.filter(
+    (a) => a.dentistId === selectedDentistId || a.dentistName?.toLowerCase().includes(currentDentist.name.toLowerCase())
+  );
+  const patientPastAppointments = appointments.filter(
+    (a) =>
+      a.patientId === selectedPatient?.id ||
+      a.patientName?.toLowerCase() === selectedPatient?.name.toLowerCase()
+  );
 
   const handleSaveClinicalRecord = (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,20 +107,36 @@ export const DentistDashboard: React.FC<DentistDashboardProps> = ({
           </div>
         </div>
 
-        {/* Doctor Switcher Dropdown */}
-        <div className="flex items-center space-x-2">
-          <span className="text-xs font-semibold text-slate-500">Switch Doctor:</span>
-          <select
-            value={selectedDentistId}
-            onChange={(e) => setSelectedDentistId(e.target.value)}
-            className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
-          >
-            {dentists.map((doc) => (
-              <option key={doc.id} value={doc.id}>
-                {doc.name} ({doc.specialization})
-              </option>
-            ))}
-          </select>
+        {/* Doctor Switcher Dropdown, Live Clock & Google Sheets Sync */}
+        <div className="flex flex-wrap items-center gap-3">
+          {onSyncWithGoogleSheets && (
+            <button
+              onClick={onSyncWithGoogleSheets}
+              disabled={isSyncingSheets}
+              title={`Google Sheets Connected. Click to re-fetch live records. Last synced: ${lastSyncTime}`}
+              className="flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100/70 transition-all cursor-pointer shadow-2xs"
+            >
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="hidden sm:inline">Google Sheets</span>
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-700 shrink-0 ${isSyncingSheets ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+          <RealTimeClockBadge variant="header" showStatus={true} showSeconds={true} />
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-semibold text-slate-500">Switch Doctor:</span>
+            <select
+              value={selectedDentistId}
+              onChange={(e) => setSelectedDentistId(e.target.value)}
+              className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-800 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
+            >
+              {dentists.map((doc) => (
+                <option key={doc.id} value={doc.id}>
+                  {doc.name} ({doc.specialization})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 

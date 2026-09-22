@@ -103,4 +103,40 @@ export interface ClinicNotification {
   type: 'reminder' | 'request' | 'testimonial' | 'approval';
 }
 
+export type TreatmentStatus = 'Planned' | 'In Progress' | 'Completed';
+
+export interface TreatmentRecord {
+  id: string;
+  patientId: string;
+  patientName: string;
+  dentistId: string;
+  dentistName: string;
+  procedureName: string;
+  toothNumber: string; // e.g. "Tooth #16" or "Full Arch"
+  diagnosis: string;
+  status: TreatmentStatus;
+  estimatedCost: number;
+  dateStarted: string;
+  dateCompleted?: string;
+  nextFollowUp?: string;
+  prescriptions: string[];
+  progressNotes: string[];
+}
+
+export type DocumentCategory = 'X-Ray' | 'Lab Report' | 'Treatment Plan' | 'Consent Form' | 'Prescription';
+
+export interface PatientDocument {
+  id: string;
+  patientId: string;
+  patientName: string;
+  title: string;
+  category: DocumentCategory;
+  fileType: 'image' | 'pdf' | 'doc';
+  fileSize: string; // e.g. "2.4 MB"
+  uploadedAt: string;
+  fileUrl: string;
+  notes?: string;
+  dentistName?: string;
+}
+
 export type AppView = 'website' | 'admin' | 'dentist' | 'patient' | 'gas_guide';

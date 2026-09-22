@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Appointment, Patient, Dentist, DentalService, ActivityItem, ClinicNotification, AppointmentStatus } from '../types';
+import { Appointment, Patient, Dentist, DentalService, ActivityItem, ClinicNotification, AppointmentStatus, TreatmentRecord, PatientDocument } from '../types';
 import { 
   Search, 
   Bell, 
@@ -30,8 +30,24 @@ import {
   Sparkles,
   ArrowUpRight,
   ShieldCheck,
-  Plus
+  Plus,
+  FolderOpen,
+  Activity as ActivityIcon,
+  Layers,
+  FileText,
+  RefreshCw,
+  FileSpreadsheet
 } from 'lucide-react';
+import { AdminPatientManagement } from './admin/AdminPatientManagement';
+import { AdminAppointmentScheduling } from './admin/AdminAppointmentScheduling';
+import { AdminTreatmentTracking } from './admin/AdminTreatmentTracking';
+import { AdminDocumentManagement } from './admin/AdminDocumentManagement';
+import { AdminAnalytics } from './admin/AdminAnalytics';
+import { AdminDentistsView } from './admin/AdminDentistsView';
+import { AdminServicesView } from './admin/AdminServicesView';
+import { AdminNotificationsView } from './admin/AdminNotificationsView';
+import { useRealTimeClock } from '../hooks/useRealTimeClock';
+import { RealTimeClockBadge } from './RealTimeClockBadge';
 
 interface AdminDashboardProps {
   appointments: Appointment[];
@@ -40,12 +56,23 @@ interface AdminDashboardProps {
   services: DentalService[];
   activity: ActivityItem[];
   notifications: ClinicNotification[];
+  treatments?: TreatmentRecord[];
+  documents?: PatientDocument[];
   onApproveAppointment: (id: string) => void;
   onRejectAppointment: (id: string, reason?: string) => void;
   onCompleteAppointment: (id: string) => void;
   onOpenBookingModal: () => void;
   onSelectPatient: (patientId: string) => void;
   onSelectDentist: (dentistId: string) => void;
+  onAddPatient?: (patient: Patient) => void;
+  onUpdatePatient?: (patient: Patient) => void;
+  onAddTreatment?: (record: TreatmentRecord) => void;
+  onUpdateTreatment?: (record: TreatmentRecord) => void;
+  onAddDocument?: (doc: PatientDocument) => void;
+  onDeleteDocument?: (id: string) => void;
+  isSyncingSheets?: boolean;
+  onSyncWithGoogleSheets?: () => void;
+  lastSyncTime?: string;
 }
 
 export const AdminDashboard: React.FC<AdminDashboardProps> = ({
@@ -55,18 +82,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   services,
   activity,
   notifications,
+  treatments = [],
+  documents = [],
   onApproveAppointment,
   onRejectAppointment,
   onCompleteAppointment,
   onOpenBookingModal,
   onSelectPatient,
   onSelectDentist,
+  onAddPatient,
+  onUpdatePatient,
+  onAddTreatment,
+  onUpdateTreatment,
+  onAddDocument,
+  onDeleteDocument,
+  isSyncingSheets = false,
+  onSyncWithGoogleSheets,
+  lastSyncTime = 'Just now',
 }) => {
+  const { greeting, now } = useRealTimeClock();
   const [activeSidebarTab, setActiveSidebarTab] = useState<string>('dashboard');
   const [statusFilter, setStatusFilter] = useState<'All' | AppointmentStatus>('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedAppointmentForDetail, setSelectedAppointmentForDetail] = useState<Appointment | null>(null);
-  const [selectedDateCalendar, setSelectedDateCalendar] = useState<number>(16);
+  const [calendarViewDate, setCalendarViewDate] = useState<Date>(() => new Date());
+  const [selectedDateCalendar, setSelectedDateCalendar] = useState<number>(() => new Date().getDate());
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -149,8 +189,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
 
-        {/* Right tools: Notifications & Staff Profile */}
-        <div className="flex items-center space-x-4">
+        {/* Right tools: Google Sheets Sync, Notifications & Staff Profile */}
+        <div className="flex items-center space-x-3">
+          {/* Google Sheets Live Status & Sync Button */}
+          {onSyncWithGoogleSheets && (
+            <button
+              onClick={onSyncWithGoogleSheets}
+              disabled={isSyncingSheets}
+              title={`Google Sheets Connected. Click to re-fetch live records. Last synced: ${lastSyncTime}`}
+              className="flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100/70 transition-all cursor-pointer shadow-2xs"
+            >
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="hidden sm:inline">Google Sheets</span>
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-700 shrink-0 ${isSyncingSheets ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+
           {/* Notification bell */}
           <div className="relative">
             <button
@@ -241,14 +296,65 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <button
               onClick={() => setActiveSidebarTab('patients')}
-              className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 activeSidebarTab === 'patients'
                   ? 'bg-teal-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <Users className="w-4 h-4" />
-              <span>Patients</span>
+              <div className="flex items-center space-x-3">
+                <Users className="w-4 h-4" />
+                <span>Patients</span>
+              </div>
+              <span className="bg-slate-800 text-slate-300 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {patients.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveSidebarTab('treatments')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeSidebarTab === 'treatments'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <ActivityIcon className="w-4 h-4" />
+                <span>Treatment Plans</span>
+              </div>
+              <span className="bg-blue-600/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {treatments.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveSidebarTab('documents')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeSidebarTab === 'documents'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <FolderOpen className="w-4 h-4" />
+                <span>Document Vault</span>
+              </div>
+              <span className="bg-teal-700/80 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {documents.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setActiveSidebarTab('analytics')}
+              className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeSidebarTab === 'analytics' || activeSidebarTab === 'reports'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Analytics & KPIs</span>
             </button>
 
             <button
@@ -271,32 +377,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
-              <HeartHandshake className="w-4 h-4" />
-              <span>Services</span>
-            </button>
-
-            <button
-              onClick={() => setActiveSidebarTab('testimonials')}
-              className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeSidebarTab === 'testimonials'
-                  ? 'bg-teal-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Testimonials</span>
-            </button>
-
-            <button
-              onClick={() => setActiveSidebarTab('reports')}
-              className={`w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                activeSidebarTab === 'reports'
-                  ? 'bg-teal-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
-              }`}
-            >
-              <BarChart3 className="w-4 h-4" />
-              <span>Reports</span>
+              <Layers className="w-4 h-4" />
+              <span>Services & Fees</span>
             </button>
 
             <button
@@ -312,7 +394,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <span>Notifications</span>
               </div>
               <span className="bg-rose-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                3
+                {notifications.length}
               </span>
             </button>
           </div>
@@ -331,28 +413,123 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
         {/* Center Main Dashboard Area */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 space-y-6">
-          
-          {/* Welcome Header row matching inspiration */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <div className="text-xs font-semibold text-teal-700 uppercase tracking-wider">
-                Staff & Reception Portal
-              </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
-                Good morning, Maria Santos!
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
-                Here's what's happening at Drizzle Dental Clinic today.
-              </p>
-            </div>
+
+          {/* Mobile Tab Navigation */}
+          <div className="lg:hidden flex items-center space-x-2 overflow-x-auto pb-2 scrollbar-none">
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+              { id: 'appointments', label: `Appts (${pendingAppointments.length})`, icon: CalendarDays },
+              { id: 'patients', label: `Patients (${patients.length})`, icon: Users },
+              { id: 'treatments', label: `Treatments (${treatments.length})`, icon: ActivityIcon },
+              { id: 'documents', label: `Vault (${documents.length})`, icon: FolderOpen },
+              { id: 'analytics', label: 'Analytics', icon: BarChart3 },
+              { id: 'dentists', label: 'Dentists', icon: Stethoscope },
+              { id: 'services', label: 'Services', icon: Layers },
+              { id: 'notifications', label: `Alerts (${notifications.length})`, icon: Bell },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveSidebarTab(tab.id)}
+                  className={`flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer transition-colors ${
+                    activeSidebarTab === tab.id
+                      ? 'bg-teal-700 text-white shadow-xs'
+                      : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <Icon className="w-3.5 h-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Conditional Rendering for Staff & Admin Modules */}
+          {activeSidebarTab === 'appointments' ? (
+            <AdminAppointmentScheduling
+              appointments={appointments}
+              dentists={dentists}
+              services={services}
+              onApproveAppointment={onApproveAppointment}
+              onRejectAppointment={onRejectAppointment}
+              onCompleteAppointment={onCompleteAppointment}
+              onOpenBookingModal={onOpenBookingModal}
+              onToast={showToast}
+            />
+          ) : activeSidebarTab === 'patients' ? (
+            <AdminPatientManagement
+              patients={patients}
+              appointments={appointments}
+              treatments={treatments}
+              onAddPatient={onAddPatient || (() => {})}
+              onUpdatePatient={onUpdatePatient || (() => {})}
+              onOpenBookingForPatient={(name, email, phone) => {
+                onOpenBookingModal();
+              }}
+              onToast={showToast}
+            />
+          ) : activeSidebarTab === 'treatments' ? (
+            <AdminTreatmentTracking
+              treatments={treatments}
+              patients={patients}
+              dentists={dentists}
+              onAddTreatment={onAddTreatment || (() => {})}
+              onUpdateTreatment={onUpdateTreatment || (() => {})}
+              onToast={showToast}
+            />
+          ) : activeSidebarTab === 'documents' ? (
+            <AdminDocumentManagement
+              documents={documents}
+              patients={patients}
+              dentists={dentists}
+              onAddDocument={onAddDocument || (() => {})}
+              onDeleteDocument={onDeleteDocument || (() => {})}
+              onToast={showToast}
+            />
+          ) : (activeSidebarTab === 'analytics' || activeSidebarTab === 'reports') ? (
+            <AdminAnalytics
+              appointments={appointments}
+              patients={patients}
+              dentists={dentists}
+              services={services}
+              treatments={treatments}
+              onToast={showToast}
+            />
+          ) : activeSidebarTab === 'dentists' ? (
+            <AdminDentistsView
+              dentists={dentists}
+              appointments={appointments}
+              onSelectDentist={() => onSelectDentist('doc-1')}
+            />
+          ) : activeSidebarTab === 'services' ? (
+            <AdminServicesView
+              services={services}
+              onOpenBooking={onOpenBookingModal}
+            />
+          ) : activeSidebarTab === 'notifications' ? (
+            <AdminNotificationsView
+              notifications={notifications}
+              activity={activity}
+            />
+          ) : (
+            <>
+              {/* Welcome Header row matching inspiration */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <div className="text-xs font-semibold text-teal-700 uppercase tracking-wider">
+                    Staff & Reception Portal
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-0.5">
+                    {greeting}, Maria Santos!
+                  </h1>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                    Here's what's happening at Drizzle Dental Clinic today.
+                  </p>
+                </div>
 
             <div className="flex items-center space-x-3">
-              <div className="bg-white border border-slate-200/80 px-4 py-2 rounded-2xl shadow-2xs flex items-center space-x-2 text-xs text-slate-600">
-                <CalendarIcon className="w-4 h-4 text-teal-600" />
-                <span className="font-semibold text-slate-800">Tuesday, September 16, 2025</span>
-                <span className="text-slate-400">•</span>
-                <span>9:42 AM</span>
-              </div>
+              <RealTimeClockBadge variant="header" showStatus={true} showSeconds={true} />
 
               <button
                 onClick={onOpenBookingModal}
@@ -845,10 +1022,13 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
 
           </div>
+          </>
+          )}
 
         </main>
 
         {/* Right Sidebar matching AdminDashboard.png */}
+        {activeSidebarTab === 'dashboard' && (
         <aside className="w-80 bg-white border-l border-slate-200 p-5 space-y-6 hidden xl:block overflow-y-auto shrink-0">
           
           {/* Calendar Widget matching inspiration */}
@@ -862,9 +1042,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
             <div className="bg-slate-50 rounded-2xl p-3 border border-slate-200/80">
               <div className="flex items-center justify-between text-xs font-bold text-slate-800 mb-2.5">
-                <button className="p-1 hover:bg-slate-200 rounded-md"><ChevronLeft className="w-3.5 h-3.5" /></button>
-                <span>September 2025</span>
-                <button className="p-1 hover:bg-slate-200 rounded-md"><ChevronRight className="w-3.5 h-3.5" /></button>
+                <button 
+                  onClick={() => setCalendarViewDate(new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() - 1, 1))}
+                  className="p-1 hover:bg-slate-200 rounded-md cursor-pointer transition-colors"
+                  title="Previous month"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+                <span className="font-bold">
+                  {calendarViewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                </span>
+                <button 
+                  onClick={() => setCalendarViewDate(new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 1))}
+                  className="p-1 hover:bg-slate-200 rounded-md cursor-pointer transition-colors"
+                  title="Next month"
+                >
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
               </div>
 
               {/* Days of week */}
@@ -874,19 +1068,33 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
               {/* Days grid */}
               <div className="grid grid-cols-7 gap-1 text-center text-xs">
-                {[14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30].map((d) => {
-                  const isSelected = selectedDateCalendar === d;
+                {Array.from({ length: new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth(), 1).getDay() }).map((_, i) => (
+                  <div key={`empty-${i}`} className="h-7" />
+                ))}
+                {Array.from({ length: new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 0).getDate() }).map((_, i) => {
+                  const day = i + 1;
+                  const isSelected = selectedDateCalendar === day;
+                  const isToday = 
+                    day === now.getDate() && 
+                    calendarViewDate.getMonth() === now.getMonth() && 
+                    calendarViewDate.getFullYear() === now.getFullYear();
+
                   return (
                     <button
-                      key={d}
-                      onClick={() => setSelectedDateCalendar(d)}
-                      className={`h-7 rounded-lg text-[11px] font-semibold flex items-center justify-center transition-all cursor-pointer ${
+                      key={day}
+                      onClick={() => setSelectedDateCalendar(day)}
+                      className={`h-7 rounded-lg text-[11px] font-semibold flex items-center justify-center relative transition-all cursor-pointer ${
                         isSelected
                           ? 'bg-teal-600 text-white font-bold shadow-xs'
+                          : isToday
+                          ? 'bg-teal-100/70 text-teal-800 font-bold border border-teal-300'
                           : 'text-slate-700 hover:bg-slate-200/60'
                       }`}
                     >
-                      {d}
+                      {day}
+                      {isToday && !isSelected && (
+                        <span className="w-1 h-1 bg-teal-600 rounded-full absolute bottom-0.5" />
+                      )}
                     </button>
                   );
                 })}
@@ -950,6 +1158,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
 
         </aside>
+        )}
 
       </div>
 

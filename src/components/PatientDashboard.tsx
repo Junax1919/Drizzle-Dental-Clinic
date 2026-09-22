@@ -13,14 +13,20 @@ import {
   XCircle, 
   Download,
   Share2,
-  ChevronRight
+  ChevronRight,
+  RefreshCw,
+  FileSpreadsheet
 } from 'lucide-react';
+import { RealTimeClockBadge } from './RealTimeClockBadge';
 
 interface PatientDashboardProps {
   patients: Patient[];
   appointments: Appointment[];
   onOpenBookingModal: () => void;
   onCancelAppointment: (id: string) => void;
+  isSyncingSheets?: boolean;
+  onSyncWithGoogleSheets?: () => void;
+  lastSyncTime?: string;
 }
 
 export const PatientDashboard: React.FC<PatientDashboardProps> = ({
@@ -28,16 +34,22 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
   appointments,
   onOpenBookingModal,
   onCancelAppointment,
+  isSyncingSheets = false,
+  onSyncWithGoogleSheets,
+  lastSyncTime = 'Just now',
 }) => {
-  // Let patient switch profile or default to John Dela Cruz / Maria Lopez
-  const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[1]?.id || patients[0]?.id);
+  // Let patient switch profile or default to first patient (e.g. Aljune G. Quinones from Google Sheets)
+  const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[0]?.id || '');
   const [showCancelModal, setShowCancelModal] = useState<string | null>(null);
 
   const currentPatient = patients.find((p) => p.id === selectedPatientId) || patients[0];
   
   // Find all appointments for this patient
   const patientAppointments = appointments.filter(
-    (a) => a.patientName === currentPatient.name || a.patientId === currentPatient.id
+    (a) =>
+      a.patientId === currentPatient?.id ||
+      a.patientName?.toLowerCase() === currentPatient?.name.toLowerCase() ||
+      (currentPatient?.code && a.referenceNo && a.referenceNo.includes(currentPatient.code.replace('PT-', '')))
   );
 
   const latestAppointment = patientAppointments[0];
@@ -67,8 +79,22 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
           </div>
         </div>
 
-        {/* Patient Switcher */}
-        <div className="flex items-center space-x-3">
+        {/* Patient Switcher, Google Sheets Sync & Live Clock */}
+        <div className="flex flex-wrap items-center gap-3">
+          {onSyncWithGoogleSheets && (
+            <button
+              onClick={onSyncWithGoogleSheets}
+              disabled={isSyncingSheets}
+              title={`Google Sheets Connected. Click to re-fetch live records. Last synced: ${lastSyncTime}`}
+              className="flex items-center space-x-2 px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/80 hover:bg-emerald-100/70 transition-all cursor-pointer shadow-2xs"
+            >
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span className="hidden sm:inline">Google Sheets</span>
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-700 shrink-0 ${isSyncingSheets ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+          <RealTimeClockBadge variant="header" showStatus={false} showSeconds={true} />
           <div className="flex items-center space-x-2">
             <span className="text-xs font-semibold text-slate-500">Patient:</span>
             <select

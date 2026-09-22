@@ -1,17 +1,24 @@
 import React from 'react';
 import { AppView } from '../types';
-import { Globe, ShieldCheck, Stethoscope, User, FileCode2, Sparkles } from 'lucide-react';
+import { Globe, ShieldCheck, Stethoscope, User, FileCode2, Sparkles, RefreshCw, FileSpreadsheet } from 'lucide-react';
+import { RealTimeClockBadge } from './RealTimeClockBadge';
 
 interface RoleSwitcherProps {
   currentView: AppView;
   onViewChange: (view: AppView) => void;
   pendingCount: number;
+  isSyncingSheets?: boolean;
+  onSyncWithGoogleSheets?: () => void;
+  lastSyncTime?: string;
 }
 
 export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
   currentView,
   onViewChange,
   pendingCount,
+  isSyncingSheets = false,
+  onSyncWithGoogleSheets,
+  lastSyncTime = 'Just now',
 }) => {
   const views: { id: AppView; label: string; icon: React.ReactNode; badge?: number; desc: string }[] = [
     {
@@ -51,14 +58,33 @@ export const RoleSwitcher: React.FC<RoleSwitcherProps> = ({
     <div id="role-switcher-banner" className="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-50 shadow-md">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3">
         {/* Left clinic branding badge */}
-        <div className="flex items-center space-x-2">
-          <div className="w-7 h-7 rounded-lg bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400">
-            <Sparkles className="w-4 h-4" />
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-2">
+            <div className="w-7 h-7 rounded-lg bg-teal-500/20 border border-teal-500/40 flex items-center justify-center text-teal-400">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-teal-400">Role Preview & Switcher</span>
+              <p className="text-[11px] text-slate-400 hidden sm:block">Experience all interactive roles & Google Apps Script architecture</p>
+            </div>
           </div>
-          <div>
-            <span className="text-xs font-semibold uppercase tracking-wider text-teal-400">Role Preview & Switcher</span>
-            <p className="text-[11px] text-slate-400 hidden sm:block">Experience all interactive roles & Google Apps Script architecture</p>
+          <div className="hidden md:block">
+            <RealTimeClockBadge variant="dark" showSeconds={true} showDate={true} />
           </div>
+
+          {onSyncWithGoogleSheets && (
+            <button
+              onClick={onSyncWithGoogleSheets}
+              disabled={isSyncingSheets}
+              title={`Live Google Sheets connected. Click to fetch updates. Last synced: ${lastSyncTime}`}
+              className="flex items-center space-x-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-900/60 transition-all cursor-pointer"
+            >
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span className="hidden lg:inline text-[11px]">Sheets Live</span>
+              <RefreshCw className={`w-3 h-3 text-emerald-300 shrink-0 ${isSyncingSheets ? 'animate-spin' : ''}`} />
+            </button>
+          )}
         </div>
 
         {/* View Switch Buttons */}

@@ -7,7 +7,9 @@ import {
   Testimonial, 
   ActivityItem, 
   ClinicNotification, 
-  AppView 
+  AppView,
+  TreatmentRecord,
+  PatientDocument
 } from './types';
 import { 
   INITIAL_SERVICES, 
@@ -16,7 +18,9 @@ import {
   INITIAL_APPOINTMENTS, 
   INITIAL_TESTIMONIALS, 
   INITIAL_ACTIVITY, 
-  INITIAL_NOTIFICATIONS 
+  INITIAL_NOTIFICATIONS,
+  INITIAL_TREATMENTS,
+  INITIAL_DOCUMENTS
 } from './data/mockData';
 import { RoleSwitcher } from './components/RoleSwitcher';
 import { PublicWebsite } from './components/PublicWebsite';
@@ -25,19 +29,52 @@ import { DentistDashboard } from './components/DentistDashboard';
 import { PatientDashboard } from './components/PatientDashboard';
 import { BookingModal } from './components/BookingModal';
 import { GasIntegrationStudio } from './components/GasIntegrationStudio';
+import { fetchLiveGoogleSheetsData } from './services/sheetsDataService';
 
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('website');
+  const [isSyncingSheets, setIsSyncingSheets] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>('Just now');
 
-  // Persistence in localStorage
+  // Persistence in localStorage, ensuring real Google Sheets records are always preserved & prioritized
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
     const saved = localStorage.getItem('drizzle_dental_appointments');
-    return saved ? JSON.parse(saved) : INITIAL_APPOINTMENTS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(parsed.map((a: any) => a.id));
+          const existingRefs = new Set(parsed.map((a: any) => a.referenceNo));
+          const missingRealRecords = INITIAL_APPOINTMENTS.filter(
+            (a) => !existingIds.has(a.id) && !existingRefs.has(a.referenceNo)
+          );
+          return [...missingRealRecords, ...parsed];
+        }
+      } catch (e) {
+        console.warn('Error parsing saved appointments:', e);
+      }
+    }
+    return INITIAL_APPOINTMENTS;
   });
 
   const [patients, setPatients] = useState<Patient[]>(() => {
     const saved = localStorage.getItem('drizzle_dental_patients');
-    return saved ? JSON.parse(saved) : INITIAL_PATIENTS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const existingIds = new Set(parsed.map((p: any) => p.id));
+          const existingNames = new Set(parsed.map((p: any) => p.name?.toLowerCase()));
+          const missingRealPatients = INITIAL_PATIENTS.filter(
+            (p) => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
+          );
+          return [...missingRealPatients, ...parsed];
+        }
+      } catch (e) {
+        console.warn('Error parsing saved patients:', e);
+      }
+    }
+    return INITIAL_PATIENTS;
   });
 
   const [dentists] = useState<Dentist[]>(INITIAL_DENTISTS);
@@ -54,6 +91,16 @@ export default function App() {
   });
 
   const [notifications, setNotifications] = useState<ClinicNotification[]>(INITIAL_NOTIFICATIONS);
+
+  const [treatments, setTreatments] = useState<TreatmentRecord[]>(() => {
+    const saved = localStorage.getItem('drizzle_dental_treatments');
+    return saved ? JSON.parse(saved) : INITIAL_TREATMENTS;
+  });
+
+  const [documents, setDocuments] = useState<PatientDocument[]>(() => {
+    const saved = localStorage.getItem('drizzle_dental_documents');
+    return saved ? JSON.parse(saved) : INITIAL_DOCUMENTS;
+  });
 
   // Booking Modal State
   const [isBookingOpen, setIsBookingOpen] = useState(false);
@@ -76,6 +123,52 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('drizzle_dental_activity', JSON.stringify(activity));
   }, [activity]);
+
+  useEffect(() => {
+    localStorage.setItem('drizzle_dental_treatments', JSON.stringify(treatments));
+  }, [treatments]);
+
+  useEffect(() => {
+    localStorage.setItem('drizzle_dental_documents', JSON.stringify(documents));
+  }, [documents]);
+
+  // Live Google Sheets Data Synchronization
+  const handleSyncWithGoogleSheets = async () => {
+    setIsSyncingSheets(true);
+    try {
+      const res = await fetchLiveGoogleSheetsData();
+      if (res.success && res.appointments.length > 0) {
+        setAppointments((prev) => {
+          const liveIds = new Set(res.appointments.map((a) => a.id));
+          const liveRefs = new Set(res.appointments.map((a) => a.referenceNo));
+          const nonConflicting = prev.filter((a) => !liveIds.has(a.id) && !liveRefs.has(a.referenceNo));
+          return [...res.appointments, ...nonConflicting];
+        });
+
+        setPatients((prev) => {
+          const livePatIds = new Set(res.patients.map((p) => p.id));
+          const livePatNames = new Set(res.patients.map((p) => p.name?.toLowerCase()));
+          const nonConflicting = prev.filter((p) => !livePatIds.has(p.id) && !livePatNames.has(p.name?.toLowerCase()));
+          return [...res.patients, ...nonConflicting];
+        });
+
+        const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        setLastSyncTime(timeStr);
+      }
+    } catch (err) {
+      console.warn('Google Sheets live fetch warning:', err);
+    } finally {
+      setIsSyncingSheets(false);
+    }
+  };
+
+  useEffect(() => {
+    handleSyncWithGoogleSheets();
+    const timer = setInterval(() => {
+      handleSyncWithGoogleSheets();
+    }, 45000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Open booking modal helper
   const handleOpenBooking = (serviceId?: string, dentistId?: string) => {
@@ -329,6 +422,60 @@ export default function App() {
     setTestimonials((prev) => [newT, ...prev]);
   };
 
+  // Patient CRUD
+  const handleAddPatient = (newPatient: Patient) => {
+    setPatients((prev) => [newPatient, ...prev]);
+    const newActivity: ActivityItem = {
+      id: `act-${Date.now()}`,
+      title: `Registered new patient: ${newPatient.name}`,
+      subtitle: `Patient File ID: ${newPatient.code}`,
+      timestamp: 'Just now',
+      actor: 'Maria Santos (Staff)',
+      type: 'request',
+    };
+    setActivity((prev) => [newActivity, ...prev]);
+  };
+
+  const handleUpdatePatient = (updatedPatient: Patient) => {
+    setPatients((prev) => prev.map((p) => (p.id === updatedPatient.id ? updatedPatient : p)));
+  };
+
+  // Treatment Plans CRUD
+  const handleAddTreatment = (record: TreatmentRecord) => {
+    setTreatments((prev) => [record, ...prev]);
+    const newActivity: ActivityItem = {
+      id: `act-${Date.now()}`,
+      title: `Treatment plan logged for ${record.patientName}`,
+      subtitle: `${record.procedureName} (${record.status})`,
+      timestamp: 'Just now',
+      actor: 'Maria Santos (Staff)',
+      type: 'complete',
+    };
+    setActivity((prev) => [newActivity, ...prev]);
+  };
+
+  const handleUpdateTreatment = (record: TreatmentRecord) => {
+    setTreatments((prev) => prev.map((t) => (t.id === record.id ? record : t)));
+  };
+
+  // Document Vault CRUD
+  const handleAddDocument = (doc: PatientDocument) => {
+    setDocuments((prev) => [doc, ...prev]);
+    const newActivity: ActivityItem = {
+      id: `act-${Date.now()}`,
+      title: `Uploaded document for ${doc.patientName}`,
+      subtitle: `${doc.title} (${doc.category})`,
+      timestamp: 'Just now',
+      actor: 'Maria Santos (Staff)',
+      type: 'request',
+    };
+    setActivity((prev) => [newActivity, ...prev]);
+  };
+
+  const handleDeleteDocument = (id: string) => {
+    setDocuments((prev) => prev.filter((d) => d.id !== id));
+  };
+
   const pendingCount = appointments.filter((a) => a.status === 'Pending').length;
 
   return (
@@ -339,6 +486,9 @@ export default function App() {
         currentView={currentView}
         onViewChange={(v) => setCurrentView(v)}
         pendingCount={pendingCount}
+        isSyncingSheets={isSyncingSheets}
+        onSyncWithGoogleSheets={handleSyncWithGoogleSheets}
+        lastSyncTime={lastSyncTime}
       />
 
       {/* 2. Active View Render */}
@@ -364,12 +514,23 @@ export default function App() {
             services={services}
             activity={activity}
             notifications={notifications}
+            treatments={treatments}
+            documents={documents}
             onApproveAppointment={handleApproveAppointment}
             onRejectAppointment={handleRejectAppointment}
             onCompleteAppointment={(id) => handleCompleteAppointment(id)}
             onOpenBookingModal={() => handleOpenBooking()}
             onSelectPatient={() => setCurrentView('patient')}
             onSelectDentist={() => setCurrentView('dentist')}
+            onAddPatient={handleAddPatient}
+            onUpdatePatient={handleUpdatePatient}
+            onAddTreatment={handleAddTreatment}
+            onUpdateTreatment={handleUpdateTreatment}
+            onAddDocument={handleAddDocument}
+            onDeleteDocument={handleDeleteDocument}
+            isSyncingSheets={isSyncingSheets}
+            onSyncWithGoogleSheets={handleSyncWithGoogleSheets}
+            lastSyncTime={lastSyncTime}
           />
         )}
 
@@ -380,6 +541,9 @@ export default function App() {
             patients={patients}
             onCompleteAppointment={handleCompleteAppointment}
             onUpdatePatientHistory={handleUpdatePatientHistory}
+            isSyncingSheets={isSyncingSheets}
+            onSyncWithGoogleSheets={handleSyncWithGoogleSheets}
+            lastSyncTime={lastSyncTime}
           />
         )}
 
@@ -389,6 +553,9 @@ export default function App() {
             appointments={appointments}
             onOpenBookingModal={() => handleOpenBooking()}
             onCancelAppointment={(id) => handleRejectAppointment(id, 'Patient cancelled via portal')}
+            isSyncingSheets={isSyncingSheets}
+            onSyncWithGoogleSheets={handleSyncWithGoogleSheets}
+            lastSyncTime={lastSyncTime}
           />
         )}
 

@@ -40,7 +40,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [selectedServiceId, setSelectedServiceId] = useState<string>(initialServiceId || services[0]?.id || '');
   const [selectedDentistId, setSelectedDentistId] = useState<string>(initialDentistId || dentists[0]?.id || '');
-  const [selectedDate, setSelectedDate] = useState<string>('2025-09-16');
+  const [selectedDate, setSelectedDate] = useState<string>(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [selectedTime, setSelectedTime] = useState<string>('10:30 AM');
   
   // Patient details

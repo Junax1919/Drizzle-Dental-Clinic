@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DentalService, Dentist, Testimonial, Appointment } from '../types';
 import { AppointmentBookingSection } from './AppointmentBookingSection';
+import { RealTimeClockBadge } from './RealTimeClockBadge';
 import heroImage from '../assets/images/dental_hero_patient_1790050849093.jpg';
 import { 
   Calendar, 
@@ -127,6 +128,29 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
 
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans">
+      {/* Top Clinic Info & Real-Time Status Bar */}
+      <div className="bg-slate-50 border-b border-slate-200/70 text-xs text-slate-600 hidden sm:block">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-1.5 flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-1.5 text-slate-500">
+              <MapPin className="w-3.5 h-3.5 text-teal-600" />
+              <span>Drizzle Tower, Ortigas Center, Pasig City</span>
+            </div>
+            <span className="text-slate-300">|</span>
+            <div className="flex items-center space-x-1.5 text-slate-500">
+              <Phone className="w-3.5 h-3.5 text-teal-600" />
+              <span>(02) 8876-5432 / +63 917 890 1234</span>
+            </div>
+          </div>
+          <div className="flex items-center space-x-3">
+            <RealTimeClockBadge variant="compact" showSeconds={true} />
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Open Today: 8:00 AM – 7:00 PM
+            </span>
+          </div>
+        </div>
+      </div>
+
       {/* 1. Header Navigation matching Inspiration */}
       <header id="clinic-public-header" className="bg-white border-b border-slate-100 sticky top-[41px] z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
