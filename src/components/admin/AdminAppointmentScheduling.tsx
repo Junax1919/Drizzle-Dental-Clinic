@@ -63,6 +63,27 @@ export const AdminAppointmentScheduling: React.FC<AdminAppointmentSchedulingProp
   // Dynamic real-time week timeline calculation
   const [weekOffset, setWeekOffset] = useState<number>(0);
 
+  // Timeline view switcher inside Calendar section: Weekly vs Monthly
+  const [calendarTimelineView, setCalendarTimelineView] = useState<'weekly' | 'monthly'>('weekly');
+  const [monthOffset, setMonthOffset] = useState<number>(0);
+  const [selectedMonthDate, setSelectedMonthDate] = useState<string | null>(null);
+
+  // Robust date comparison helper
+  const matchDate = (dateA?: string, dateB?: string) => {
+    if (!dateA || !dateB) return false;
+    if (dateA === dateB) return true;
+    const pA = dateA.split('-');
+    const pB = dateB.split('-');
+    if (pA.length === 3 && pB.length === 3) {
+      return (
+        parseInt(pA[0], 10) === parseInt(pB[0], 10) &&
+        parseInt(pA[1], 10) === parseInt(pB[1], 10) &&
+        parseInt(pA[2], 10) === parseInt(pB[2], 10)
+      );
+    }
+    return false;
+  };
+
   const weekDays = useMemo(() => {
     const today = new Date();
     const dayOfWeek = today.getDay();
@@ -94,6 +115,100 @@ export const AdminAppointmentScheduling: React.FC<AdminAppointmentSchedulingProp
     const last = weekDays[5];
     return `${first.formatted} – ${last.formatted}, ${new Date(first.dateStr).getFullYear()}`;
   }, [weekDays]);
+
+  // Dynamic Month Timeline calculation
+  const monthData = useMemo(() => {
+    const today = new Date();
+    const targetDate = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+    const targetYear = targetDate.getFullYear();
+    const targetMonth = targetDate.getMonth();
+
+    const monthLabel = targetDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const daysInMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
+    const firstDayOfWeek = (new Date(targetYear, targetMonth, 1).getDay() + 6) % 7; // 0 = Mon, 6 = Sun
+    const daysInPrevMonth = new Date(targetYear, targetMonth, 0).getDate();
+
+    type MonthCell = {
+      dateStr: string;
+      dayNumber: number;
+      isCurrentMonth: boolean;
+      isToday: boolean;
+    };
+
+    const cells: MonthCell[] = [];
+
+    // Previous month padding
+    for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+      const dayNum = daysInPrevMonth - i;
+      const prevDate = new Date(targetYear, targetMonth - 1, dayNum);
+      const y = prevDate.getFullYear();
+      const m = String(prevDate.getMonth() + 1).padStart(2, '0');
+      const d = String(dayNum).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+      const isToday =
+        y === today.getFullYear() &&
+        prevDate.getMonth() === today.getMonth() &&
+        dayNum === today.getDate();
+      cells.push({
+        dateStr,
+        dayNumber: dayNum,
+        isCurrentMonth: false,
+        isToday,
+      });
+    }
+
+    // Current month days
+    for (let dayNum = 1; dayNum <= daysInMonth; dayNum++) {
+      const y = targetYear;
+      const m = String(targetMonth + 1).padStart(2, '0');
+      const d = String(dayNum).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+      const isToday =
+        targetYear === today.getFullYear() &&
+        targetMonth === today.getMonth() &&
+        dayNum === today.getDate();
+      cells.push({
+        dateStr,
+        dayNumber: dayNum,
+        isCurrentMonth: true,
+        isToday,
+      });
+    }
+
+    // Next month padding to complete standard 7-column rows
+    const remainder = cells.length % 7;
+    const nextDaysNeeded = remainder === 0 ? 0 : 7 - remainder;
+    for (let dayNum = 1; dayNum <= nextDaysNeeded; dayNum++) {
+      const nextDate = new Date(targetYear, targetMonth + 1, dayNum);
+      const y = nextDate.getFullYear();
+      const m = String(nextDate.getMonth() + 1).padStart(2, '0');
+      const d = String(dayNum).padStart(2, '0');
+      const dateStr = `${y}-${m}-${d}`;
+      const isToday =
+        y === today.getFullYear() &&
+        nextDate.getMonth() === today.getMonth() &&
+        dayNum === today.getDate();
+      cells.push({
+        dateStr,
+        dayNumber: dayNum,
+        isCurrentMonth: false,
+        isToday,
+      });
+    }
+
+    const curMonthPrefix = `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}`;
+    const totalAppointmentsInMonth = appointments.filter((a) =>
+      a.date?.startsWith(curMonthPrefix)
+    ).length;
+
+    return {
+      monthLabel,
+      targetYear,
+      targetMonth,
+      cells,
+      totalAppointmentsInMonth,
+    };
+  }, [monthOffset, appointments]);
 
   const filteredAppointments = appointments.filter((a) => {
     const matchesStatus = statusFilter === 'All' || a.status === statusFilter;
@@ -444,101 +559,415 @@ export const AdminAppointmentScheduling: React.FC<AdminAppointmentSchedulingProp
         </div>
       ) : (
         /* Calendar Schedule Matrix View */
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-6 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-2xs p-5 sm:p-6 space-y-4 sm:space-y-5">
+          {/* Header with Timeline Switcher and Date Navigation */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-100">
             <div>
-              <h3 className="text-base font-bold text-slate-900">Weekly Schedule Timeline</h3>
-              <p className="text-xs text-slate-500">{weekRangeLabel}</p>
+              <div className="flex items-center space-x-2">
+                <h3 className="text-base font-bold text-slate-900">
+                  {calendarTimelineView === 'weekly' ? 'Weekly Schedule Timeline' : 'Monthly Schedule Timeline'}
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">
+                  {calendarTimelineView === 'weekly' ? 'Week View' : 'Month View'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {calendarTimelineView === 'weekly'
+                  ? weekRangeLabel
+                  : `${monthData.monthLabel} • ${monthData.totalAppointmentsInMonth} scheduled ${
+                      monthData.totalAppointmentsInMonth === 1 ? 'appointment' : 'appointments'
+                    }`}
+              </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => setWeekOffset((prev) => prev - 1)}
-                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
-                title="Previous Week"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              {weekOffset !== 0 && (
+
+            <div className="flex flex-wrap items-center gap-2.5">
+              {/* Timeline Switcher: Weekly vs Monthly */}
+              <div className="flex items-center bg-slate-100 p-1 rounded-xl">
                 <button
-                  onClick={() => setWeekOffset(0)}
-                  className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 transition-colors cursor-pointer"
+                  type="button"
+                  onClick={() => setCalendarTimelineView('weekly')}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    calendarTimelineView === 'weekly'
+                      ? 'bg-white text-teal-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
                 >
-                  Current Week
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  <span>Weekly Timeline</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setCalendarTimelineView('monthly')}
+                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                    calendarTimelineView === 'monthly'
+                      ? 'bg-white text-teal-900 shadow-2xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <CalendarIcon className="w-3.5 h-3.5" />
+                  <span>Monthly Timeline</span>
+                </button>
+              </div>
+
+              {/* Navigation buttons */}
+              {calendarTimelineView === 'weekly' ? (
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    onClick={() => setWeekOffset((prev) => prev - 1)}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
+                    title="Previous Week"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  {weekOffset !== 0 && (
+                    <button
+                      onClick={() => setWeekOffset(0)}
+                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 transition-colors cursor-pointer"
+                    >
+                      Current Week
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setWeekOffset((prev) => prev + 1)}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
+                    title="Next Week"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center space-x-1.5">
+                  <button
+                    onClick={() => setMonthOffset((prev) => prev - 1)}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
+                    title="Previous Month"
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  {monthOffset !== 0 && (
+                    <button
+                      onClick={() => {
+                        setMonthOffset(0);
+                        setSelectedMonthDate(null);
+                      }}
+                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 border border-teal-200 transition-colors cursor-pointer"
+                    >
+                      Current Month
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setMonthOffset((prev) => prev + 1)}
+                    className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
+                    title="Next Month"
+                  >
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
               )}
-              <button
-                onClick={() => setWeekOffset((prev) => prev + 1)}
-                className="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 text-slate-700 transition-colors cursor-pointer"
-                title="Next Week"
-              >
-                <ChevronRight className="w-4 h-4" />
-              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            {weekDays.map((dayObj) => {
-              const dayAppts = appointments.filter((a) => a.date === dayObj.dateStr);
-              return (
-                <div
-                  key={dayObj.dateStr}
-                  className={`rounded-2xl p-3 border space-y-2 transition-all ${
-                    dayObj.isToday
-                      ? 'bg-teal-50/50 border-teal-300 ring-2 ring-teal-500/20'
-                      : 'bg-slate-50 border-slate-200/70'
-                  }`}
-                >
-                  <div className="border-b border-slate-200/80 pb-2 flex items-center justify-between">
-                    <div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className={`text-xs font-bold ${dayObj.isToday ? 'text-teal-900' : 'text-slate-900'}`}>
-                          {dayObj.dayName}
-                        </span>
-                        {dayObj.isToday && (
-                          <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-teal-600 text-white">
-                            Today
+          {/* Conditional Rendering: Weekly or Monthly Schedule Timeline */}
+          {calendarTimelineView === 'weekly' ? (
+            /* Weekly Schedule Grid */
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+              {weekDays.map((dayObj) => {
+                const dayAppts = filteredAppointments.filter((a) => matchDate(a.date, dayObj.dateStr));
+                return (
+                  <div
+                    key={dayObj.dateStr}
+                    className={`rounded-2xl p-3 border space-y-2 transition-all ${
+                      dayObj.isToday
+                        ? 'bg-teal-50/50 border-teal-300 ring-2 ring-teal-500/20'
+                        : 'bg-slate-50 border-slate-200/70'
+                    }`}
+                  >
+                    <div className="border-b border-slate-200/80 pb-2 flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center space-x-1.5">
+                          <span className={`text-xs font-bold ${dayObj.isToday ? 'text-teal-900' : 'text-slate-900'}`}>
+                            {dayObj.dayName}
+                          </span>
+                          {dayObj.isToday && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-extrabold bg-teal-600 text-white">
+                              Today
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-mono mt-0.5">{dayObj.formatted}</div>
+                      </div>
+                      <span className="text-[11px] font-bold text-slate-600 bg-white px-1.5 py-0.5 rounded-md border border-slate-200">
+                        {dayAppts.length}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 min-h-[140px]">
+                      {dayAppts.length === 0 ? (
+                        <div className="text-[11px] text-slate-400 italic py-6 text-center">No bookings</div>
+                      ) : (
+                        dayAppts.map((a) => (
+                          <div
+                            key={a.id}
+                            onClick={() => setDetailAppointment(a)}
+                            className="p-2 rounded-xl bg-white border border-slate-200/90 shadow-2xs hover:border-teal-400 cursor-pointer transition-all text-[11px]"
+                          >
+                            <div className="font-bold text-teal-800 flex items-center justify-between">
+                              <span>{a.timeSlot}</span>
+                              <span
+                                className={`w-2 h-2 rounded-full ${
+                                  a.status === 'Approved'
+                                    ? 'bg-teal-500'
+                                    : a.status === 'Pending'
+                                    ? 'bg-amber-500'
+                                    : a.status === 'Completed'
+                                    ? 'bg-emerald-500'
+                                    : 'bg-rose-500'
+                                }`}
+                              />
+                            </div>
+                            <div className="font-semibold text-slate-900 truncate mt-0.5">{a.patientName}</div>
+                            <div className="text-[10px] text-slate-500 truncate">{a.serviceName}</div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Monthly Schedule Timeline */
+            <div className="space-y-4">
+              {/* Legend & helper */}
+              <div className="flex flex-wrap items-center justify-between text-xs text-slate-600 gap-2 px-1">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="font-semibold text-slate-700">Status:</span>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-teal-500"></span>
+                    <span className="text-[11px]">Approved</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+                    <span className="text-[11px]">Pending</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <span className="text-[11px]">Completed</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5">
+                    <span className="w-2 h-2 rounded-full bg-rose-500"></span>
+                    <span className="text-[11px]">Cancelled</span>
+                  </div>
+                </div>
+                <div className="text-[11px] text-slate-400 italic hidden sm:block">
+                  Click any appointment to view details or dispatch notifications
+                </div>
+              </div>
+
+              {/* Weekday column headers (Mon - Sun) */}
+              <div className="grid grid-cols-7 gap-1.5 sm:gap-2 text-center text-xs font-bold text-slate-500 uppercase tracking-wider py-2 bg-slate-50 rounded-xl">
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div>Sat</div>
+                <div>Sun</div>
+              </div>
+
+              {/* 7-column calendar matrix */}
+              <div className="grid grid-cols-7 gap-1.5 sm:gap-2">
+                {monthData.cells.map((cell, idx) => {
+                  const dayAppts = filteredAppointments.filter((a) => matchDate(a.date, cell.dateStr));
+                  const isSelected = selectedMonthDate === cell.dateStr;
+
+                  return (
+                    <div
+                      key={`${cell.dateStr}-${idx}`}
+                      onClick={() => {
+                        if (dayAppts.length > 0) {
+                          setSelectedMonthDate(isSelected ? null : cell.dateStr);
+                        }
+                      }}
+                      className={`min-h-[96px] sm:min-h-[114px] p-1.5 sm:p-2 rounded-2xl border transition-all flex flex-col justify-between ${
+                        !cell.isCurrentMonth
+                          ? 'bg-slate-50/50 border-slate-100 text-slate-400 opacity-60'
+                          : cell.isToday
+                          ? 'bg-teal-50/40 border-teal-300 ring-2 ring-teal-500/20 text-slate-900 shadow-2xs'
+                          : isSelected
+                          ? 'bg-teal-50/20 border-teal-400 ring-2 ring-teal-400/30'
+                          : 'bg-white border-slate-200/80 hover:border-slate-300 text-slate-800 shadow-2xs'
+                      } ${dayAppts.length > 0 ? 'cursor-pointer' : ''}`}
+                    >
+                      {/* Top Header of Date Cell */}
+                      <div className="flex items-center justify-between">
+                        {cell.isToday ? (
+                          <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-xs shadow-2xs">
+                            {cell.dayNumber}
+                          </div>
+                        ) : (
+                          <span
+                            className={`text-xs font-semibold ${
+                              cell.isCurrentMonth ? 'text-slate-800' : 'text-slate-400'
+                            }`}
+                          >
+                            {cell.dayNumber}
+                          </span>
+                        )}
+
+                        {dayAppts.length > 0 && (
+                          <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800 border border-teal-200/60">
+                            {dayAppts.length}
                           </span>
                         )}
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono mt-0.5">{dayObj.formatted}</div>
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-600 bg-white px-1.5 py-0.5 rounded-md border border-slate-200">
-                      {dayAppts.length}
-                    </span>
-                  </div>
 
-                  <div className="space-y-1.5 min-h-[140px]">
-                    {dayAppts.length === 0 ? (
-                      <div className="text-[11px] text-slate-400 italic py-6 text-center">No bookings</div>
-                    ) : (
-                      dayAppts.map((a) => (
-                        <div
-                          key={a.id}
-                          onClick={() => setDetailAppointment(a)}
-                          className="p-2 rounded-xl bg-white border border-slate-200/90 shadow-2xs hover:border-teal-400 cursor-pointer transition-all text-[11px]"
-                        >
-                          <div className="font-bold text-teal-800 flex items-center justify-between">
-                            <span>{a.timeSlot}</span>
-                            <span
-                              className={`w-2 h-2 rounded-full ${
-                                a.status === 'Approved'
-                                  ? 'bg-teal-500'
-                                  : a.status === 'Pending'
-                                  ? 'bg-amber-500'
-                                  : 'bg-emerald-500'
-                              }`}
-                            />
+                      {/* Appointment Chips in Month Cell */}
+                      <div className="flex-1 space-y-1 mt-1 overflow-hidden">
+                        {dayAppts.slice(0, 2).map((a) => {
+                          const statusBg =
+                            a.status === 'Approved'
+                              ? 'bg-teal-50 hover:bg-teal-100/80 border-teal-200 text-teal-900'
+                              : a.status === 'Pending'
+                              ? 'bg-amber-50 hover:bg-amber-100/80 border-amber-200 text-amber-900'
+                              : a.status === 'Completed'
+                              ? 'bg-emerald-50 hover:bg-emerald-100/80 border-emerald-200 text-emerald-900'
+                              : 'bg-rose-50 hover:bg-rose-100/80 border-rose-200 text-rose-900';
+
+                          const dotColor =
+                            a.status === 'Approved'
+                              ? 'bg-teal-500'
+                              : a.status === 'Pending'
+                              ? 'bg-amber-500'
+                              : a.status === 'Completed'
+                              ? 'bg-emerald-500'
+                              : 'bg-rose-500';
+
+                          return (
+                            <div
+                              key={a.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDetailAppointment(a);
+                              }}
+                              className={`p-1 sm:p-1.5 rounded-lg border text-[10px] sm:text-[11px] leading-tight transition-all cursor-pointer shadow-2xs ${statusBg}`}
+                              title={`${a.timeSlot} - ${a.patientName} (${a.serviceName})`}
+                            >
+                              <div className="flex items-center justify-between font-bold">
+                                <span className="truncate">{a.timeSlot}</span>
+                                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ml-1 ${dotColor}`} />
+                              </div>
+                              <div className="truncate font-semibold mt-0.5 text-slate-800">
+                                {a.patientName}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {dayAppts.length > 2 && (
+                          <div
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedMonthDate(cell.dateStr);
+                            }}
+                            className="text-[10px] font-bold text-teal-700 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-md py-0.5 px-1 text-center cursor-pointer transition-colors"
+                          >
+                            +{dayAppts.length - 2} more
                           </div>
-                          <div className="font-semibold text-slate-900 truncate mt-0.5">{a.patientName}</div>
-                          <div className="text-[10px] text-slate-500 truncate">{a.serviceName}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Selected Day Agenda Drawer if a day with bookings is selected */}
+              {selectedMonthDate && (() => {
+                const selectedDayAppts = filteredAppointments.filter((a) =>
+                  matchDate(a.date, selectedMonthDate)
+                );
+                if (selectedDayAppts.length === 0) return null;
+
+                const formattedSelectedDate = new Date(`${selectedMonthDate}T00:00:00`).toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  month: 'long',
+                  day: 'numeric',
+                  year: 'numeric',
+                });
+
+                return (
+                  <div className="mt-4 p-4 rounded-2xl bg-teal-50/60 border border-teal-200 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <CalendarDays className="w-4 h-4 text-teal-700" />
+                        <span className="font-bold text-slate-900 text-sm">
+                          Schedule for {formattedSelectedDate}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-teal-600 text-white">
+                          {selectedDayAppts.length} {selectedDayAppts.length === 1 ? 'booking' : 'bookings'}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setSelectedMonthDate(null)}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-800 cursor-pointer"
+                      >
+                        ✕ Close day list
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {selectedDayAppts.map((appt) => (
+                        <div
+                          key={appt.id}
+                          className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs space-y-2 hover:border-teal-400 transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-xs text-teal-800">{appt.timeSlot}</span>
+                            <span
+                              className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                appt.status === 'Approved'
+                                  ? 'bg-teal-50 text-teal-700 border border-teal-200'
+                                  : appt.status === 'Pending'
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : appt.status === 'Completed'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}
+                            >
+                              {appt.status}
+                            </span>
+                          </div>
+
+                          <div>
+                            <div className="font-bold text-slate-900 text-xs">{appt.patientName}</div>
+                            <div className="text-[11px] text-slate-500">{appt.serviceName} • {appt.dentistName}</div>
+                            <div className="text-[10px] text-teal-600 font-mono mt-0.5">{appt.referenceNo}</div>
+                          </div>
+
+                          <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
+                            <button
+                              onClick={() => setReminderModalAppointment(appt)}
+                              className="text-amber-700 hover:text-amber-800 font-semibold flex items-center space-x-1 cursor-pointer"
+                            >
+                              <BellRing className="w-3 h-3" />
+                              <span>Reminder</span>
+                            </button>
+                            <button
+                              onClick={() => setDetailAppointment(appt)}
+                              className="text-teal-700 hover:text-teal-800 font-bold flex items-center space-x-1 cursor-pointer"
+                            >
+                              <Eye className="w-3 h-3" />
+                              <span>Details</span>
+                            </button>
+                          </div>
                         </div>
-                      ))
-                    )}
+                      ))}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })()}
+            </div>
+          )}
         </div>
       )}
 
