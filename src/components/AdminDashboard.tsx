@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Appointment, Patient, Dentist, DentalService, ActivityItem, ClinicNotification, AppointmentStatus, TreatmentRecord, PatientDocument } from '../types';
 import { 
   Search, 
@@ -120,6 +120,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const approvedAppointments = appointments.filter((a) => a.status === 'Approved');
   const completedAppointments = appointments.filter((a) => a.status === 'Completed');
   const cancelledAppointments = appointments.filter((a) => a.status === 'Cancelled');
+
+  const serviceDistribution = useMemo(() => {
+    const counts: Record<string, number> = {};
+    appointments.forEach((a) => {
+      const s = a.serviceName || 'General Dentistry';
+      counts[s] = (counts[s] || 0) + 1;
+    });
+    const colors = ['#0ea5e9', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6'];
+    const total = appointments.length || 1;
+    return Object.entries(counts).map(([name, count], idx) => ({
+      name,
+      count,
+      percent: Math.round((count / total) * 100),
+      color: colors[idx % colors.length],
+    }));
+  }, [appointments]);
 
   const filteredAppointments = appointments.filter((a) => {
     const matchesStatus = statusFilter === 'All' || a.status === statusFilter;
@@ -544,16 +560,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* 6 Metric Cards matching AdminDashboard.png */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
             
-            {/* 1. Today's Appointments */}
+            {/* 1. Total Appointments */}
             <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
               <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mb-2">
                 <CalendarIcon className="w-4 h-4" />
               </div>
-              <div className="text-[11px] font-semibold text-slate-500">Today's Appointments</div>
-              <div className="text-2xl font-black text-slate-900 mt-1">24</div>
+              <div className="text-[11px] font-semibold text-slate-500">Total Bookings</div>
+              <div className="text-2xl font-black text-slate-900 mt-1">{appointments.length}</div>
               <div className="text-[10px] text-emerald-600 font-bold mt-1 flex items-center space-x-0.5">
-                <span>↑ 12%</span>
-                <span className="text-slate-400 font-normal">from yesterday</span>
+                <span>Live records</span>
               </div>
             </div>
 
@@ -565,7 +580,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="text-[11px] font-semibold text-amber-900">Pending Requests</div>
               <div className="text-2xl font-black text-amber-700 mt-1">{pendingAppointments.length}</div>
               <div className="text-[10px] text-amber-600 font-bold mt-1 flex items-center space-x-0.5">
-                <span>Action needed</span>
+                <span>{pendingAppointments.length > 0 ? 'Action needed' : 'All clear'}</span>
               </div>
             </div>
 
@@ -577,8 +592,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="text-[11px] font-semibold text-slate-500">Approved</div>
               <div className="text-2xl font-black text-slate-900 mt-1">{approvedAppointments.length}</div>
               <div className="text-[10px] text-emerald-600 font-bold mt-1 flex items-center space-x-0.5">
-                <span>↑ 20%</span>
-                <span className="text-slate-400 font-normal">from yesterday</span>
+                <span>Confirmed visits</span>
               </div>
             </div>
 
@@ -590,8 +604,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="text-[11px] font-semibold text-slate-500">Completed</div>
               <div className="text-2xl font-black text-slate-900 mt-1">{completedAppointments.length}</div>
               <div className="text-[10px] text-emerald-600 font-bold mt-1 flex items-center space-x-0.5">
-                <span>↑ 20%</span>
-                <span className="text-slate-400 font-normal">from yesterday</span>
+                <span>Finished care</span>
               </div>
             </div>
 
@@ -603,7 +616,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <div className="text-[11px] font-semibold text-slate-500">Cancelled / No Shows</div>
               <div className="text-2xl font-black text-slate-900 mt-1">{cancelledAppointments.length}</div>
               <div className="text-[10px] text-slate-400 font-normal mt-1 flex items-center space-x-0.5">
-                <span>↓ 1% from yesterday</span>
+                <span>{cancelledAppointments.length} cancelled</span>
               </div>
             </div>
 
@@ -613,10 +626,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 <Users className="w-4 h-4" />
               </div>
               <div className="text-[11px] font-semibold text-slate-500">Total Patients</div>
-              <div className="text-2xl font-black text-slate-900 mt-1">342</div>
+              <div className="text-2xl font-black text-slate-900 mt-1">{patients.length}</div>
               <div className="text-[10px] text-indigo-600 font-bold mt-1 flex items-center space-x-0.5">
-                <span>↑ 5%</span>
-                <span className="text-slate-400 font-normal">last month</span>
+                <span>Google Sheets</span>
               </div>
             </div>
 
@@ -718,68 +730,31 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {/* Donut SVG */}
                 <div className="sm:col-span-5 flex justify-center relative">
                   <svg viewBox="0 0 100 100" className="w-28 h-28 transform -rotate-90">
-                    <circle cx="50" cy="50" r="38" stroke="#0ea5e9" strokeWidth="12" fill="none" strokeDasharray="80 200" strokeDashoffset="0" />
-                    <circle cx="50" cy="50" r="38" stroke="#3b82f6" strokeWidth="12" fill="none" strokeDasharray="50 200" strokeDashoffset="-80" />
-                    <circle cx="50" cy="50" r="38" stroke="#10b981" strokeWidth="12" fill="none" strokeDasharray="30 200" strokeDashoffset="-130" />
-                    <circle cx="50" cy="50" r="38" stroke="#f59e0b" strokeWidth="12" fill="none" strokeDasharray="20 200" strokeDashoffset="-160" />
-                    <circle cx="50" cy="50" r="38" stroke="#ec4899" strokeWidth="12" fill="none" strokeDasharray="20 200" strokeDashoffset="-180" />
-                    <circle cx="50" cy="50" r="38" stroke="#94a3b8" strokeWidth="12" fill="none" strokeDasharray="38 200" strokeDashoffset="-200" />
+                    <circle cx="50" cy="50" r="38" stroke="#0ea5e9" strokeWidth="12" fill="none" strokeDasharray="180 200" strokeDashoffset="0" />
+                    <circle cx="50" cy="50" r="38" stroke="#3b82f6" strokeWidth="12" fill="none" strokeDasharray="60 200" strokeDashoffset="-180" />
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <span className="text-[10px] text-slate-400 uppercase font-semibold">Total</span>
-                    <span className="text-xl font-bold text-slate-900 leading-none">24</span>
+                    <span className="text-xl font-bold text-slate-900 leading-none">{appointments.length}</span>
                   </div>
                 </div>
 
                 {/* Donut Legend */}
                 <div className="sm:col-span-7 space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#0ea5e9]"></span>
-                      <span className="text-slate-600 font-medium">Cleaning</span>
+                  {serviceDistribution.map((item) => (
+                    <div key={item.name} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: item.color }}></span>
+                        <span className="text-slate-600 font-medium truncate max-w-[140px]">{item.name}</span>
+                      </div>
+                      <span className="font-bold text-slate-800">
+                        {item.count} <span className="text-slate-400 font-normal">({item.percent}%)</span>
+                      </span>
                     </div>
-                    <span className="font-bold text-slate-800">8 <span className="text-slate-400 font-normal">(33%)</span></span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#3b82f6]"></span>
-                      <span className="text-slate-600 font-medium">Filling</span>
-                    </div>
-                    <span className="font-bold text-slate-800">5 <span className="text-slate-400 font-normal">(21%)</span></span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#10b981]"></span>
-                      <span className="text-slate-600 font-medium">Extraction</span>
-                    </div>
-                    <span className="font-bold text-slate-800">3 <span className="text-slate-400 font-normal">(12%)</span></span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#f59e0b]"></span>
-                      <span className="text-slate-600 font-medium">Orthodontics</span>
-                    </div>
-                    <span className="font-bold text-slate-800">2 <span className="text-slate-400 font-normal">(8%)</span></span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#ec4899]"></span>
-                      <span className="text-slate-600 font-medium">Whitening</span>
-                    </div>
-                    <span className="font-bold text-slate-800">2 <span className="text-slate-400 font-normal">(8%)</span></span>
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2.5 h-2.5 rounded-full bg-[#94a3b8]"></span>
-                      <span className="text-slate-600 font-medium">Others</span>
-                    </div>
-                    <span className="font-bold text-slate-800">4 <span className="text-slate-400 font-normal">(17%)</span></span>
-                  </div>
+                  ))}
+                  {serviceDistribution.length === 0 && (
+                    <div className="text-slate-400 italic text-center py-2">No procedures recorded yet</div>
+                  )}
                 </div>
               </div>
             </div>

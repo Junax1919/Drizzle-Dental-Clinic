@@ -42,7 +42,23 @@ export const PatientDashboard: React.FC<PatientDashboardProps> = ({
   const [selectedPatientId, setSelectedPatientId] = useState<string>(patients[0]?.id || '');
   const [showCancelModal, setShowCancelModal] = useState<string | null>(null);
 
-  const currentPatient = patients.find((p) => p.id === selectedPatientId) || patients[0];
+  const defaultPatientFallback: Patient = {
+    id: 'pat-default',
+    name: 'Patient',
+    code: 'PT-0001',
+    email: '',
+    phone: '',
+    age: 30,
+    gender: 'Other',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80',
+    bloodType: 'O+',
+    allergies: [],
+    totalVisits: 0,
+    lastVisit: '2026-09-24',
+    historySummary: 'No previous records'
+  };
+
+  const currentPatient = patients.find((p) => p.id === selectedPatientId) || patients[0] || defaultPatientFallback;
   
   // Find all appointments for this patient
   const patientAppointments = appointments.filter(

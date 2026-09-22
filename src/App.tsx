@@ -31,24 +31,43 @@ import { BookingModal } from './components/BookingModal';
 import { GasIntegrationStudio } from './components/GasIntegrationStudio';
 import { fetchLiveGoogleSheetsData } from './services/sheetsDataService';
 
+// Helper to filter out dummy or sample records
+const isDummyRecord = (id: string, name?: string) => {
+  const dummyIds = new Set([
+    'apt-1', 'apt-2', 'apt-3', 'apt-4', 'apt-5', 'apt-6', 'apt-7', 'apt-8', 'apt-9',
+    'pat-1', 'pat-2', 'pat-3', 'pat-4', 'pat-5', 'pat-6'
+  ]);
+  const dummyNames = new Set([
+    'maria lopez', 'john dela cruz', 'ana santos', 'luis garcia', 'grace villanueva', 'pedro reyes'
+  ]);
+  if (dummyIds.has(id)) return true;
+  if (name && dummyNames.has(name.trim().toLowerCase())) return true;
+  return false;
+};
+
 export default function App() {
   const [currentView, setCurrentView] = useState<AppView>('website');
   const [isSyncingSheets, setIsSyncingSheets] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('Just now');
 
-  // Persistence in localStorage, ensuring real Google Sheets records are always preserved & prioritized
+  // Persistence in localStorage, strictly keeping ONLY actual records from Google Sheets
   const [appointments, setAppointments] = useState<Appointment[]>(() => {
     const saved = localStorage.getItem('drizzle_dental_appointments');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map((a: any) => a.id));
-          const existingRefs = new Set(parsed.map((a: any) => a.referenceNo));
-          const missingRealRecords = INITIAL_APPOINTMENTS.filter(
-            (a) => !existingIds.has(a.id) && !existingRefs.has(a.referenceNo)
+          const actualSaved = parsed.filter(
+            (a: any) => !isDummyRecord(a.id, a.patientName)
           );
-          return [...missingRealRecords, ...parsed];
+          if (actualSaved.length > 0) {
+            const existingIds = new Set(actualSaved.map((a: any) => a.id));
+            const existingRefs = new Set(actualSaved.map((a: any) => a.referenceNo));
+            const missingRealRecords = INITIAL_APPOINTMENTS.filter(
+              (a) => !existingIds.has(a.id) && !existingRefs.has(a.referenceNo)
+            );
+            return [...missingRealRecords, ...actualSaved];
+          }
         }
       } catch (e) {
         console.warn('Error parsing saved appointments:', e);
@@ -63,12 +82,17 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const existingIds = new Set(parsed.map((p: any) => p.id));
-          const existingNames = new Set(parsed.map((p: any) => p.name?.toLowerCase()));
-          const missingRealPatients = INITIAL_PATIENTS.filter(
-            (p) => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
+          const actualSaved = parsed.filter(
+            (p: any) => !isDummyRecord(p.id, p.name)
           );
-          return [...missingRealPatients, ...parsed];
+          if (actualSaved.length > 0) {
+            const existingIds = new Set(actualSaved.map((p: any) => p.id));
+            const existingNames = new Set(actualSaved.map((p: any) => p.name?.toLowerCase()));
+            const missingRealPatients = INITIAL_PATIENTS.filter(
+              (p) => !existingIds.has(p.id) && !existingNames.has(p.name.toLowerCase())
+            );
+            return [...missingRealPatients, ...actualSaved];
+          }
         }
       } catch (e) {
         console.warn('Error parsing saved patients:', e);
@@ -87,19 +111,57 @@ export default function App() {
 
   const [activity, setActivity] = useState<ActivityItem[]>(() => {
     const saved = localStorage.getItem('drizzle_dental_activity');
-    return saved ? JSON.parse(saved) : INITIAL_ACTIVITY;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const valid = parsed.filter(
+            (item: any) =>
+              !['Maria Lopez', 'John Dela Cruz', 'Ana Santos', 'Luis Garcia', 'Pedro Reyes'].some((name) =>
+                item.title?.includes(name) || item.subtitle?.includes(name)
+              )
+          );
+          if (valid.length > 0) return valid;
+        }
+      } catch (e) {
+        console.warn('Error parsing activity:', e);
+      }
+    }
+    return INITIAL_ACTIVITY;
   });
 
   const [notifications, setNotifications] = useState<ClinicNotification[]>(INITIAL_NOTIFICATIONS);
 
   const [treatments, setTreatments] = useState<TreatmentRecord[]>(() => {
     const saved = localStorage.getItem('drizzle_dental_treatments');
-    return saved ? JSON.parse(saved) : INITIAL_TREATMENTS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const valid = parsed.filter((t: any) => !isDummyRecord(t.patientId, t.patientName));
+          if (valid.length > 0) return valid;
+        }
+      } catch (e) {
+        console.warn('Error parsing treatments:', e);
+      }
+    }
+    return INITIAL_TREATMENTS;
   });
 
   const [documents, setDocuments] = useState<PatientDocument[]>(() => {
     const saved = localStorage.getItem('drizzle_dental_documents');
-    return saved ? JSON.parse(saved) : INITIAL_DOCUMENTS;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          const valid = parsed.filter((d: any) => !isDummyRecord(d.patientId, d.patientName));
+          if (valid.length > 0) return valid;
+        }
+      } catch (e) {
+        console.warn('Error parsing documents:', e);
+      }
+    }
+    return INITIAL_DOCUMENTS;
   });
 
   // Booking Modal State
@@ -141,14 +203,18 @@ export default function App() {
         setAppointments((prev) => {
           const liveIds = new Set(res.appointments.map((a) => a.id));
           const liveRefs = new Set(res.appointments.map((a) => a.referenceNo));
-          const nonConflicting = prev.filter((a) => !liveIds.has(a.id) && !liveRefs.has(a.referenceNo));
+          const nonConflicting = prev.filter(
+            (a) => !liveIds.has(a.id) && !liveRefs.has(a.referenceNo) && !isDummyRecord(a.id, a.patientName)
+          );
           return [...res.appointments, ...nonConflicting];
         });
 
         setPatients((prev) => {
           const livePatIds = new Set(res.patients.map((p) => p.id));
           const livePatNames = new Set(res.patients.map((p) => p.name?.toLowerCase()));
-          const nonConflicting = prev.filter((p) => !livePatIds.has(p.id) && !livePatNames.has(p.name?.toLowerCase()));
+          const nonConflicting = prev.filter(
+            (p) => !livePatIds.has(p.id) && !livePatNames.has(p.name?.toLowerCase()) && !isDummyRecord(p.id, p.name)
+          );
           return [...res.patients, ...nonConflicting];
         });
 
