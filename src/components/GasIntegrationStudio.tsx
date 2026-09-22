@@ -20,10 +20,17 @@ import {
 export const GasIntegrationStudio: React.FC = () => {
   const [copiedPrompt, setCopiedPrompt] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [gasWebhookUrl, setGasWebhookUrl] = useState('');
+  const [gasWebhookUrl, setGasWebhookUrl] = useState(() => {
+    return localStorage.getItem('drizzle_gas_webhook_url') || 'https://script.google.com/macros/s/AKfycbwNAfiMm4EggvNQvF5eVwZ9QWUXtM-Oxisk1nfxTAp6I4Sj95YbDKxf3uCBqKSpe0c/exec';
+  });
   const [testPayloadStatus, setTestPayloadStatus] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [activeTab, setActiveTab] = useState<'prompt' | 'code' | 'schema' | 'architecture'>('prompt');
+
+  const handleUpdateWebhookUrl = (url: string) => {
+    setGasWebhookUrl(url);
+    localStorage.setItem('drizzle_gas_webhook_url', url);
+  };
 
   const masterPromptText = `You are a Senior Full-Stack Web Developer and certified Google Apps Script & Google Sheets Architect.
 
@@ -643,7 +650,7 @@ function logAudit(actor, action, details) {
           <input
             type="url"
             value={gasWebhookUrl}
-            onChange={(e) => setGasWebhookUrl(e.target.value)}
+            onChange={(e) => handleUpdateWebhookUrl(e.target.value)}
             placeholder="Paste your Apps Script Web App URL (https://script.google.com/macros/s/.../exec) or leave blank for simulation"
             className="flex-1 text-xs px-4 py-3 rounded-xl border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-teal-500"
           />

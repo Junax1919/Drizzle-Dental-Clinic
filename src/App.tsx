@@ -131,6 +131,31 @@ export default function App() {
     };
     setActivity((prev) => [newActivity, ...prev]);
 
+    // Automatic Real-Time Sync to Google Apps Script / Google Sheets
+    const gasWebhook = localStorage.getItem('drizzle_gas_webhook_url') || 'https://script.google.com/macros/s/AKfycbwNAfiMm4EggvNQvF5eVwZ9QWUXtM-Oxisk1nfxTAp6I4Sj95YbDKxf3uCBqKSpe0c/exec';
+    if (gasWebhook) {
+      fetch(gasWebhook, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_appointment',
+          referenceNo: newAppointment.referenceNo,
+          patientId: newAppointment.patientId,
+          patientName: newAppointment.patientName,
+          patientEmail: newAppointment.patientEmail,
+          patientPhone: newAppointment.patientPhone,
+          dentistId: newAppointment.dentistId,
+          dentistName: newAppointment.dentistName,
+          serviceName: newAppointment.serviceName,
+          date: newAppointment.date,
+          timeSlot: newAppointment.timeSlot,
+          notes: newAppointment.notes,
+          medicalAlerts: newAppointment.medicalHistory,
+        }),
+      }).catch((err) => console.warn('Google Sheets sync warning:', err));
+    }
+
     return newAppointment;
   };
 
@@ -172,11 +197,28 @@ export default function App() {
         type: 'approval',
       };
       setNotifications((prev) => [newNotif, ...prev]);
+
+      // Sync approval to Google Sheets
+      const gasWebhook = localStorage.getItem('drizzle_gas_webhook_url') || 'https://script.google.com/macros/s/AKfycbwNAfiMm4EggvNQvF5eVwZ9QWUXtM-Oxisk1nfxTAp6I4Sj95YbDKxf3uCBqKSpe0c/exec';
+      if (gasWebhook) {
+        fetch(gasWebhook, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'approve_appointment',
+            appointmentId: targetAppt.id,
+            referenceNo: targetAppt.referenceNo,
+            staffName: 'Maria Santos (Staff)',
+          }),
+        }).catch((err) => console.warn('Google Sheets sync warning:', err));
+      }
     }
   };
 
   // Reject / Cancel appointment
   const handleRejectAppointment = (id: string, reason?: string) => {
+    const targetAppt = appointments.find((a) => a.id === id);
     setAppointments((prev) =>
       prev.map((a) => {
         if (a.id === id) {
@@ -190,7 +232,22 @@ export default function App() {
       })
     );
 
-    const targetAppt = appointments.find((a) => a.id === id);
+    // Sync cancellation to Google Sheets
+    const gasWebhook = localStorage.getItem('drizzle_gas_webhook_url') || 'https://script.google.com/macros/s/AKfycbwNAfiMm4EggvNQvF5eVwZ9QWUXtM-Oxisk1nfxTAp6I4Sj95YbDKxf3uCBqKSpe0c/exec';
+    if (gasWebhook && targetAppt) {
+      fetch(gasWebhook, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'reject_appointment',
+          appointmentId: targetAppt.id,
+          referenceNo: targetAppt.referenceNo,
+          reason: reason || 'Cancelled by clinic',
+        }),
+      }).catch((err) => console.warn('Google Sheets sync warning:', err));
+    }
+
     if (targetAppt) {
       const newActivity: ActivityItem = {
         id: `act-${Date.now()}`,
