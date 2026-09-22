@@ -320,7 +320,10 @@ export const PublicWebsite: React.FC<PublicWebsiteProps> = ({
                   <div className="w-14 h-14 rounded-2xl bg-teal-50 border border-teal-100 flex items-center justify-center mb-6 group-hover:scale-105 transition-transform">
                     {getServiceIcon(service.name)}
                   </div>
-                  <h3 className="text-xl font-bold text-slate-900 group-hover:text-teal-700 transition-colors">
+                  <h3 
+                    id={`service-title-${service.id}`} 
+                    className="text-xl font-extrabold text-[#0f2e46] group-hover:text-[#155e75] tracking-tight transition-colors"
+                  >
                     {service.name}
                   </h3>
                   <p className="mt-2.5 text-sm text-slate-500 leading-relaxed">
