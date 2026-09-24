@@ -379,13 +379,16 @@ export async function syncClinicUserToGoogleSheet(
     name: user.name,
     fullName: user.name,
     email: user.email,
-    phone: user.phone,
+    phone: user.phone || '',
     role: user.role,
     status: user.status,
-    department: user.department,
-    joinedDate: user.joinedDate,
-    lastLogin: user.lastLogin,
+    department: user.department || 'General Operations',
+    joinedDate: user.joinedDate || new Date().toISOString().split('T')[0],
+    lastLogin: user.lastLogin || 'Never',
     assignedBy: user.assignedBy || 'System Admin',
+    avatar: user.avatar || '',
+    password: user.password || '',
+    hasPassword: user.password ? 'Yes' : 'No',
   };
 
   try {

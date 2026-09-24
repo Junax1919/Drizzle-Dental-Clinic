@@ -330,6 +330,8 @@ function handleCreateUser(data) {
   const joinedDate = data.joinedDate || new Date().toISOString().split('T')[0];
   const lastLogin = data.lastLogin || 'Never';
   const assignedBy = data.assignedBy || 'System Admin';
+  const password = data.password ? '[Set / Encrypted]' : (data.hasPassword === 'Yes' ? '[Set / Encrypted]' : 'Not Set');
+  const avatar = data.avatar || '';
 
   // Append new user row to Google Sheets
   sheet.appendRow([
@@ -342,7 +344,9 @@ function handleCreateUser(data) {
     department,
     joinedDate,
     lastLogin,
-    assignedBy
+    assignedBy,
+    password,
+    avatar
   ]);
 
   logAudit(assignedBy, 'Create User & Assign Role', fullName + ' (' + email + ') assigned as ' + role);
@@ -474,18 +478,18 @@ function setupSpreadsheet() {
   if (!usersSheet) {
     usersSheet = ss.insertSheet('Users');
     usersSheet.appendRow([
-      'UserID', 'FullName', 'Email', 'Phone', 'Role', 'Status', 'Department', 'JoinedDate', 'LastLogin', 'AssignedBy'
+      'UserID', 'FullName', 'Email', 'Phone', 'Role', 'Status', 'Department', 'JoinedDate', 'LastLogin', 'AssignedBy', 'Password', 'ProfilePhoto'
     ]);
-    usersSheet.getRange("A1:J1").setBackground("#4f46e5").setFontColor("#ffffff").setFontWeight("bold");
+    usersSheet.getRange("A1:L1").setBackground("#4f46e5").setFontColor("#ffffff").setFontWeight("bold");
     
     // Seed default team accounts and roles
-    usersSheet.appendRow(['usr-1', 'Althea Ramos', 'it.admin@drizzledental.com', '+63 922 678 9012', 'System Admin', 'Active', 'IT & Systems Administration', '2024-01-15', 'Today, 08:30 AM', 'System Director']);
-    usersSheet.appendRow(['usr-2', 'Atty. Juan Dela Cruz', 'admin@drizzledental.com', '+63 921 567 8901', 'Clinic Admin', 'Active', 'Clinic Operations & Management', '2023-08-10', 'Today, 09:15 AM', 'Board of Directors']);
-    usersSheet.appendRow(['usr-3', 'Dr. Michael Reyes', 'dr.michael.reyes@drizzledental.com', '+63 918 234 5678', 'Dentist', 'Active', 'General & Cosmetic Dentistry', '2022-03-01', 'Today, 08:45 AM', 'Clinic Admin']);
-    usersSheet.appendRow(['usr-4', 'Dr. Anna Cruz', 'dr.anna.cruz@drizzledental.com', '+63 919 345 6789', 'Dentist', 'Active', 'Orthodontics & Pediatric', '2022-06-15', 'Yesterday, 05:20 PM', 'Clinic Admin']);
-    usersSheet.appendRow(['usr-5', 'Dr. Carlo Santos', 'dr.carlo.santos@drizzledental.com', '+63 920 456 7890', 'Dentist', 'Active', 'Oral Surgery & Implants', '2023-01-20', 'Yesterday, 04:10 PM', 'Clinic Admin']);
-    usersSheet.appendRow(['usr-6', 'Maria Santos', 'maria.santos@drizzledental.com', '+63 917 123 4567', 'Front Desk', 'Active', 'Front Desk & Reception', '2023-04-12', 'Today, 07:55 AM', 'Clinic Admin']);
-    usersSheet.appendRow(['usr-7', 'Rochelle Mendoza', 'rochelle.mendoza@drizzledental.com', '+63 923 789 0123', 'Front Desk', 'Active', 'Patient Scheduling & Triage', '2024-02-01', 'Today, 08:10 AM', 'Clinic Admin']);
+    usersSheet.appendRow(['usr-1', 'Althea Ramos', 'it.admin@drizzledental.com', '+63 922 678 9012', 'System Admin', 'Active', 'IT & Systems Administration', '2024-01-15', 'Today, 08:30 AM', 'System Director', '[Set / Encrypted]', '']);
+    usersSheet.appendRow(['usr-2', 'Atty. Juan Dela Cruz', 'admin@drizzledental.com', '+63 921 567 8901', 'Clinic Admin', 'Active', 'Clinic Operations & Management', '2023-08-10', 'Today, 09:15 AM', 'Board of Directors', '[Set / Encrypted]', '']);
+    usersSheet.appendRow(['usr-3', 'Dr. Michael Reyes', 'dr.michael.reyes@drizzledental.com', '+63 918 234 5678', 'Dentist', 'Active', 'General & Cosmetic Dentistry', '2022-03-01', 'Today, 08:45 AM', 'Clinic Admin', '[Set / Encrypted]', '']);
+    usersSheet.appendRow(['usr-4', 'Dr. Anna Cruz', 'dr.anna.cruz@drizzledental.com', '+63 919 345 6789', 'Dentist', 'Active', 'Orthodontics & Pediatric', '2022-06-15', 'Yesterday, 05:20 PM', 'Clinic Admin', '[Set / Encrypted]', '']);
+    usersSheet.appendRow(['usr-5', 'Dr. Carlo Santos', 'dr.carlo.santos@drizzledental.com', '+63 920 456 7890', 'Dentist', 'Active', 'Oral Surgery & Implants', '2023-01-20', 'Yesterday, 04:10 PM', 'Clinic Admin', '[Set / Encrypted]', '']);
+    usersSheet.appendRow(['usr-6', 'Maria Santos', 'maria.santos@drizzledental.com', '+63 917 123 4567', 'Front Desk', 'Active', 'Front Desk & Reception', '2023-04-12', 'Today, 07:55 AM', 'Clinic Admin', '[Set / Encrypted]', '']);
+    usersSheet.appendRow(['usr-7', 'Rochelle Mendoza', 'rochelle.mendoza@drizzledental.com', '+63 923 789 0123', 'Front Desk', 'Active', 'Patient Scheduling & Triage', '2024-02-01', 'Today, 08:10 AM', 'Clinic Admin', '[Set / Encrypted]', '']);
   }
 
   return { appointmentsSheet: appts, patientsSheet: patients, usersSheet: usersSheet };

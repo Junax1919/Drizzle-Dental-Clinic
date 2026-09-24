@@ -154,6 +154,7 @@ export interface ClinicUser {
   phone?: string;
   role: UserRole;
   avatar?: string;
+  password?: string;
   status: 'Active' | 'Inactive';
   department?: string;
   joinedDate?: string;
