@@ -42,6 +42,7 @@ I want you to build a modern, high-converting Dental Appointment Booking Web App
 3. Database: Google Sheets workbook with tabs:
    - 'Appointments': [ID, ReferenceNo, PatientID, PatientName, Email, Phone, DentistID, DentistName, Service, Date, TimeSlot, Status, Notes, MedicalAlerts, ApprovedBy, ApprovedAt, CreatedAt]
    - 'Patients': [ID, PatientCode, FullName, Email, Phone, Age, Gender, BloodType, Allergies, TotalVisits, LastVisitDate, MedicalHistorySummary]
+   - 'Users': [UserID, FullName, Email, Phone, Role, Status, Department, JoinedDate, LastLogin, AssignedBy]
    - 'Dentists': [ID, Name, Title, Specialization, Room, AvailableDays, Rating, ImageURL]
    - 'Services': [ID, Name, Category, Duration, EstimatedPrice, Description]
    - 'AuditLog': [Timestamp, Actor, Action, Details]
@@ -336,7 +337,26 @@ function setupSpreadsheet() {
     patients.getRange("A1:K1").setBackground("#0e7490").setFontColor("#ffffff").setFontWeight("bold");
   }
 
-  return { appointmentsSheet: appts, patientsSheet: patients };
+  // Sheet 3: Users (User Management & Role Assignment)
+  let usersSheet = ss.getSheetByName('Users');
+  if (!usersSheet) {
+    usersSheet = ss.insertSheet('Users');
+    usersSheet.appendRow([
+      'UserID', 'FullName', 'Email', 'Phone', 'Role', 'Status', 'Department', 'JoinedDate', 'LastLogin', 'AssignedBy'
+    ]);
+    usersSheet.getRange("A1:J1").setBackground("#4f46e5").setFontColor("#ffffff").setFontWeight("bold");
+    
+    // Seed default team accounts and roles
+    usersSheet.appendRow(['usr-1', 'Althea Ramos', 'it.admin@drizzledental.com', '+63 922 678 9012', 'System Admin', 'Active', 'IT & Systems Administration', '2024-01-15', 'Today, 08:30 AM', 'System Director']);
+    usersSheet.appendRow(['usr-2', 'Atty. Juan Dela Cruz', 'admin@drizzledental.com', '+63 921 567 8901', 'Clinic Admin', 'Active', 'Clinic Operations & Management', '2023-08-10', 'Today, 09:15 AM', 'Board of Directors']);
+    usersSheet.appendRow(['usr-3', 'Dr. Michael Reyes', 'dr.michael.reyes@drizzledental.com', '+63 918 234 5678', 'Dentist', 'Active', 'General & Cosmetic Dentistry', '2022-03-01', 'Today, 08:45 AM', 'Clinic Admin']);
+    usersSheet.appendRow(['usr-4', 'Dr. Anna Cruz', 'dr.anna.cruz@drizzledental.com', '+63 919 345 6789', 'Dentist', 'Active', 'Orthodontics & Pediatric', '2022-06-15', 'Yesterday, 05:20 PM', 'Clinic Admin']);
+    usersSheet.appendRow(['usr-5', 'Dr. Carlo Santos', 'dr.carlo.santos@drizzledental.com', '+63 920 456 7890', 'Dentist', 'Active', 'Oral Surgery & Implants', '2023-01-20', 'Yesterday, 04:10 PM', 'Clinic Admin']);
+    usersSheet.appendRow(['usr-6', 'Maria Santos', 'maria.santos@drizzledental.com', '+63 917 123 4567', 'Front Desk', 'Active', 'Front Desk & Reception', '2023-04-12', 'Today, 07:55 AM', 'Clinic Admin']);
+    usersSheet.appendRow(['usr-7', 'Rochelle Mendoza', 'rochelle.mendoza@drizzledental.com', '+63 923 789 0123', 'Front Desk', 'Active', 'Patient Scheduling & Triage', '2024-02-01', 'Today, 08:10 AM', 'Clinic Admin']);
+  }
+
+  return { appointmentsSheet: appts, patientsSheet: patients, usersSheet: usersSheet };
 }
 
 function logAudit(actor, action, details) {
@@ -554,6 +574,42 @@ function logAudit(actor, action, details) {
                   <div key={idx} className="flex items-center justify-between p-1.5 bg-white rounded-lg border border-slate-100">
                     <span className="font-mono font-bold text-slate-800 text-[11px]">{item.col}</span>
                     <span className="text-slate-500 text-[10px]">{item.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Sheet: Users (User Management & Role Assignment) */}
+            <div className="bg-slate-50 rounded-2xl p-5 border border-purple-200/80 space-y-3 md:col-span-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-purple-900 font-bold text-sm">
+                  <FileSpreadsheet className="w-4 h-4 text-purple-600" />
+                  <span>Sheet 3: Users (User Management & User Role Assignment)</span>
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800">
+                  New Module Tab
+                </span>
+              </div>
+              <p className="text-xs text-slate-500">
+                Staff & user directory for role assignments: System Admin, Clinic Admin, Dentist, and Front Desk.
+              </p>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs">
+                {[
+                  { col: 'A: UserID', desc: 'e.g. usr-1, usr-2' },
+                  { col: 'B: FullName', desc: 'Staff/Doctor full name' },
+                  { col: 'C: Email', desc: 'Login & notification email' },
+                  { col: 'D: Phone', desc: 'Mobile contact' },
+                  { col: 'E: Role', desc: 'System Admin | Clinic Admin | Dentist | Front Desk' },
+                  { col: 'F: Status', desc: 'Active | Inactive' },
+                  { col: 'G: Department', desc: 'e.g. Front Desk, IT, Surgery' },
+                  { col: 'H: JoinedDate', desc: 'YYYY-MM-DD' },
+                  { col: 'I: LastLogin', desc: 'Login timestamp' },
+                  { col: 'J: AssignedBy', desc: 'Admin who assigned role' },
+                ].map((item, idx) => (
+                  <div key={idx} className="p-2 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                    <div className="font-mono font-bold text-purple-900 text-[11px]">{item.col}</div>
+                    <div className="text-slate-500 text-[10px] mt-0.5">{item.desc}</div>
                   </div>
                 ))}
               </div>

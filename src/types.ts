@@ -139,4 +139,26 @@ export interface PatientDocument {
   dentistName?: string;
 }
 
+export type UserRole = 
+  | 'System Admin' 
+  | 'Clinic Admin' 
+  | 'Dentist' 
+  | 'Front Desk'
+  | 'Dental Assistant'
+  | 'Billing Officer';
+
+export interface ClinicUser {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  role: UserRole;
+  avatar?: string;
+  status: 'Active' | 'Inactive';
+  department?: string;
+  joinedDate?: string;
+  lastLogin?: string;
+  assignedBy?: string;
+}
+
 export type AppView = 'website' | 'admin' | 'dentist' | 'patient' | 'gas_guide';

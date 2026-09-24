@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Appointment, Patient, Dentist, DentalService, ActivityItem, ClinicNotification, AppointmentStatus, TreatmentRecord, PatientDocument } from '../types';
+import { Appointment, Patient, Dentist, DentalService, ActivityItem, ClinicNotification, AppointmentStatus, TreatmentRecord, PatientDocument, ClinicUser } from '../types';
 import { 
   Search, 
   Bell, 
@@ -36,7 +36,8 @@ import {
   Layers,
   FileText,
   RefreshCw,
-  FileSpreadsheet
+  FileSpreadsheet,
+  UserCog
 } from 'lucide-react';
 import { AdminPatientManagement } from './admin/AdminPatientManagement';
 import { AdminAppointmentScheduling } from './admin/AdminAppointmentScheduling';
@@ -46,6 +47,8 @@ import { AdminAnalytics } from './admin/AdminAnalytics';
 import { AdminDentistsView } from './admin/AdminDentistsView';
 import { AdminServicesView } from './admin/AdminServicesView';
 import { AdminNotificationsView } from './admin/AdminNotificationsView';
+import { AdminUserManagement } from './admin/AdminUserManagement';
+import { INITIAL_USERS } from '../data/mockData';
 import { useRealTimeClock } from '../hooks/useRealTimeClock';
 import { RealTimeClockBadge } from './RealTimeClockBadge';
 
@@ -109,6 +112,48 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedDateCalendar, setSelectedDateCalendar] = useState<number>(() => new Date().getDate());
   const [showNotificationsDropdown, setShowNotificationsDropdown] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Clinic Users & Role Assignment State
+  const [clinicUsers, setClinicUsers] = useState<ClinicUser[]>(() => {
+    const saved = localStorage.getItem('drizzle_clinic_users');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed to parse clinic users', e);
+      }
+    }
+    return INITIAL_USERS;
+  });
+
+  const handleAddUser = (newUser: ClinicUser) => {
+    setClinicUsers((prev) => {
+      const updated = [newUser, ...prev];
+      localStorage.setItem('drizzle_clinic_users', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleUpdateUser = (updatedUser: ClinicUser) => {
+    setClinicUsers((prev) => {
+      const updated = prev.map((u) => (u.id === updatedUser.id ? updatedUser : u));
+      localStorage.setItem('drizzle_clinic_users', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleDeleteUser = (userId: string) => {
+    setClinicUsers((prev) => {
+      const updated = prev.filter((u) => u.id !== userId);
+      localStorage.setItem('drizzle_clinic_users', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const currentStaffUser = clinicUsers.find((u) => u.email === 'maria.santos@drizzledental.com');
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -263,7 +308,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             />
             <div className="hidden lg:block text-left">
               <div className="text-xs font-bold text-slate-900 leading-tight">Maria Santos</div>
-              <div className="text-[10px] text-teal-700 font-semibold">Staff & Reception</div>
+              <div className="text-[10px] text-teal-700 font-semibold">{currentStaffUser ? currentStaffUser.role : 'Front Desk'}</div>
             </div>
           </div>
         </div>
@@ -413,6 +458,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
                 {notifications.length}
               </span>
             </button>
+
+            <button
+              onClick={() => setActiveSidebarTab('users')}
+              className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                activeSidebarTab === 'users'
+                  ? 'bg-teal-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <div className="flex items-center space-x-3">
+                <UserCog className="w-4 h-4" />
+                <span>User Management</span>
+              </div>
+              <span className="bg-purple-600/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {clinicUsers.length}
+              </span>
+            </button>
           </div>
 
           {/* Bottom decorative tooth card matching inspiration */}
@@ -442,6 +504,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               { id: 'dentists', label: 'Dentists', icon: Stethoscope },
               { id: 'services', label: 'Services', icon: Layers },
               { id: 'notifications', label: `Alerts (${notifications.length})`, icon: Bell },
+              { id: 'users', label: `Users (${clinicUsers.length})`, icon: UserCog },
             ].map((tab) => {
               const Icon = tab.icon;
               return (
@@ -527,6 +590,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <AdminNotificationsView
               notifications={notifications}
               activity={activity}
+            />
+          ) : activeSidebarTab === 'users' ? (
+            <AdminUserManagement
+              users={clinicUsers}
+              onAddUser={handleAddUser}
+              onUpdateUser={handleUpdateUser}
+              onDeleteUser={handleDeleteUser}
+              onToast={showToast}
             />
           ) : (
             <>
