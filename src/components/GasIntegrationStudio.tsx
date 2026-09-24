@@ -110,12 +110,56 @@ function doGet(e) {
     return ContentService.createTextOutput(JSON.stringify(getAllClinicData()))
       .setMimeType(ContentService.MimeType.JSON);
   }
+
+  // If requesting raw Users data
+  if (e && e.parameter && e.parameter.action === 'getUsers') {
+    return ContentService.createTextOutput(JSON.stringify(getAllUsers()))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   
   // Serve the HTML Frontend Web App
   return HtmlService.createHtmlOutputFromFile('Index')
     .setTitle('Drizzle Dental Clinic | Appointment Booking')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+function getAllClinicData() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Appointments') || setupSpreadsheet().appointmentsSheet;
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+
+  const headers = values[0];
+  const list = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const item = {};
+    for (let h = 0; h < headers.length; h++) {
+      item[headers[h]] = row[h];
+    }
+    list.push(item);
+  }
+  return list;
+}
+
+function getAllUsers() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Users') || setupSpreadsheet().usersSheet;
+  const values = sheet.getDataRange().getValues();
+  if (values.length <= 1) return [];
+
+  const headers = values[0];
+  const list = [];
+  for (let i = 1; i < values.length; i++) {
+    const row = values[i];
+    const item = {};
+    for (let h = 0; h < headers.length; h++) {
+      item[headers[h]] = row[h];
+    }
+    list.push(item);
+  }
+  return list;
 }
 
 function doPost(e) {
@@ -146,6 +190,12 @@ function doPost(e) {
         break;
       case 'complete_appointment':
         result = handleCompleteAppointment(payload);
+        break;
+      case 'create_user':
+        result = handleCreateUser(payload);
+        break;
+      case 'update_user_role':
+        result = handleUpdateUserRole(payload);
         break;
       default:
         result = { success: false, error: 'Unknown action: ' + action };
@@ -261,7 +311,89 @@ function handleApproveAppointment(data) {
 }
 
 /**
- * 3. Google Calendar Sync
+ * 3. User Management & Role Assignment Backend
+ */
+function handleCreateUser(data) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sheet = ss.getSheetByName('Users');
+  if (!sheet) {
+    sheet = setupSpreadsheet().usersSheet;
+  }
+
+  const userId = data.userId || ('usr-' + new Date().getTime());
+  const fullName = data.name || data.fullName || 'New Clinic Staff';
+  const email = (data.email || '').toLowerCase().trim();
+  const phone = data.phone || '';
+  const role = data.role || 'Front Desk';
+  const status = data.status || 'Active';
+  const department = data.department || 'General Operations';
+  const joinedDate = data.joinedDate || new Date().toISOString().split('T')[0];
+  const lastLogin = data.lastLogin || 'Never';
+  const assignedBy = data.assignedBy || 'System Admin';
+
+  // Append new user row to Google Sheets
+  sheet.appendRow([
+    userId,
+    fullName,
+    email,
+    phone,
+    role,
+    status,
+    department,
+    joinedDate,
+    lastLogin,
+    assignedBy
+  ]);
+
+  logAudit(assignedBy, 'Create User & Assign Role', fullName + ' (' + email + ') assigned as ' + role);
+
+  return {
+    success: true,
+    message: 'User ' + fullName + ' successfully created and recorded in Google Sheet Users tab.',
+    userId: userId
+  };
+}
+
+function handleUpdateUserRole(data) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName('Users');
+  if (!sheet) return { success: false, error: 'Users sheet not found.' };
+
+  const values = sheet.getDataRange().getValues();
+  let targetRow = -1;
+  let userName = '';
+
+  for (let i = 1; i < values.length; i++) {
+    if (
+      (data.userId && values[i][0] === data.userId) ||
+      (data.email && String(values[i][2]).toLowerCase() === String(data.email).toLowerCase())
+    ) {
+      targetRow = i + 1;
+      userName = values[i][1];
+      break;
+    }
+  }
+
+  if (targetRow === -1) {
+    return { success: false, error: 'User not found in Users sheet.' };
+  }
+
+  const newRole = data.role || 'Front Desk';
+  const assignedBy = data.assignedBy || 'System Admin';
+
+  sheet.getRange(targetRow, 5).setValue(newRole);     // Role column
+  sheet.getRange(targetRow, 10).setValue(assignedBy); // AssignedBy column
+
+  logAudit(assignedBy, 'Update User Role', userName + ' re-assigned to ' + newRole);
+
+  return {
+    success: true,
+    message: 'Role for ' + userName + ' updated to ' + newRole + ' in Google Sheet.'
+  };
+}
+
+/**
+ * 4. Google Calendar Sync
  */
 function syncWithGoogleCalendar(appt) {
   try {

@@ -1,4 +1,4 @@
-import { Appointment, Patient, AppointmentStatus } from '../types';
+import { Appointment, Patient, AppointmentStatus, ClinicUser } from '../types';
 
 export const DEFAULT_GAS_WEBHOOK_URL =
   'https://script.google.com/macros/s/AKfycbwNAfiMm4EggvNQvF5eVwZ9QWUXtM-Oxisk1nfxTAp6I4Sj95YbDKxf3uCBqKSpe0c/exec';
@@ -358,4 +358,101 @@ export async function fetchLiveGoogleSheetsData(
     source,
     rawCount: appointments.length,
   };
+}
+
+/**
+ * Sends a new user payload to the Google Apps Script Webhook
+ * to append to the "Users" sheet in Google Sheets.
+ */
+export async function syncClinicUserToGoogleSheet(
+  user: ClinicUser,
+  overrideUrl?: string
+): Promise<{ success: boolean; message?: string }> {
+  const webhookUrl =
+    overrideUrl ||
+    localStorage.getItem('drizzle_gas_webhook_url') ||
+    DEFAULT_GAS_WEBHOOK_URL;
+
+  const payload = {
+    action: 'create_user',
+    userId: user.id,
+    name: user.name,
+    fullName: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    department: user.department,
+    joinedDate: user.joinedDate,
+    lastLogin: user.lastLogin,
+    assignedBy: user.assignedBy || 'System Admin',
+  };
+
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    return {
+      success: true,
+      message: 'User sync payload dispatched to Google Sheets "Users" tab.',
+    };
+  } catch (err: any) {
+    console.warn('Failed to send user to Google Sheets webhook:', err);
+    return {
+      success: false,
+      message: err?.message || 'Network error sending to Google Sheets',
+    };
+  }
+}
+
+/**
+ * Updates a user role or details in Google Sheets "Users" tab.
+ */
+export async function syncUserRoleUpdateToGoogleSheet(
+  userId: string,
+  email: string,
+  newRole: string,
+  assignedBy = 'System Admin',
+  overrideUrl?: string
+): Promise<{ success: boolean; message?: string }> {
+  const webhookUrl =
+    overrideUrl ||
+    localStorage.getItem('drizzle_gas_webhook_url') ||
+    DEFAULT_GAS_WEBHOOK_URL;
+
+  const payload = {
+    action: 'update_user_role',
+    userId,
+    email,
+    role: newRole,
+    assignedBy,
+  };
+
+  try {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    return {
+      success: true,
+      message: `Role update payload dispatched to Google Sheets for ${email}.`,
+    };
+  } catch (err: any) {
+    console.warn('Failed to send user role update to Google Sheets webhook:', err);
+    return {
+      success: false,
+      message: err?.message || 'Network error updating user in Google Sheets',
+    };
+  }
 }

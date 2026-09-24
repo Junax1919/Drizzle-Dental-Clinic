@@ -51,6 +51,7 @@ import { AdminUserManagement } from './admin/AdminUserManagement';
 import { INITIAL_USERS } from '../data/mockData';
 import { useRealTimeClock } from '../hooks/useRealTimeClock';
 import { RealTimeClockBadge } from './RealTimeClockBadge';
+import { syncClinicUserToGoogleSheet, syncUserRoleUpdateToGoogleSheet } from '../services/sheetsDataService';
 
 interface AdminDashboardProps {
   appointments: Appointment[];
@@ -135,6 +136,17 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       localStorage.setItem('drizzle_clinic_users', JSON.stringify(updated));
       return updated;
     });
+
+    // Real-Time Sync to Google Apps Script / Google Sheets "Users" Tab
+    syncClinicUserToGoogleSheet(newUser)
+      .then((res) => {
+        if (res.success) {
+          showToast(`✓ User ${newUser.name} saved to local storage & synced to Google Sheets.`);
+        }
+      })
+      .catch((err) => {
+        console.warn('Sync user to sheets warning:', err);
+      });
   };
 
   const handleUpdateUser = (updatedUser: ClinicUser) => {
@@ -143,6 +155,12 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
       localStorage.setItem('drizzle_clinic_users', JSON.stringify(updated));
       return updated;
     });
+
+    // Sync role change to Google Sheets "Users" tab
+    syncUserRoleUpdateToGoogleSheet(updatedUser.id, updatedUser.email, updatedUser.role, updatedUser.assignedBy)
+      .catch((err) => {
+        console.warn('Sync user update warning:', err);
+      });
   };
 
   const handleDeleteUser = (userId: string) => {

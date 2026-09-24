@@ -722,6 +722,14 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
                 </select>
               </div>
 
+              {/* Real-time Google Sheet sync indicator */}
+              <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-center space-x-2">
+                <FileSpreadsheet className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span className="text-[11px] leading-tight">
+                  <strong>Google Sheets Sync:</strong> This new user and assigned role will be dispatched directly to your Google Spreadsheet’s <strong>Users</strong> tab.
+                </span>
+              </div>
+
               <div className="flex items-center justify-end space-x-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -855,14 +863,22 @@ export const AdminUserManagement: React.FC<AdminUserManagementProps> = ({
             </div>
 
             {/* Explanation */}
-            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 space-y-1.5">
+            <div className="p-4 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs text-amber-900 space-y-2">
               <div className="font-bold flex items-center space-x-1.5 text-amber-950">
                 <Info className="w-4 h-4 text-amber-700" />
-                <span>Why is there no "Users" tab yet in your Google Sheet?</span>
+                <span>Why did newly added users not appear in Google Sheets?</span>
               </div>
               <p className="leading-relaxed text-amber-900/90 text-[11px]">
-                The original Google Sheet was initially set up with tabs for <strong>Appointments</strong> and <strong>Patients</strong>. To store clinic team members, logins, and assigned roles in your Google Sheet, simply add a new tab named <code className="bg-white px-1.5 py-0.5 rounded font-bold border border-amber-300">Users</code> using the columns below.
+                Google Sheets integration requires two things:
               </p>
+              <ol className="list-decimal pl-5 space-y-1 text-[11px] text-amber-950 font-medium">
+                <li>
+                  <strong>A "Users" tab:</strong> If the spreadsheet doesn't have a tab named <code className="bg-white px-1 py-0.5 rounded font-bold border border-amber-300">Users</code>, rows cannot be stored.
+                </li>
+                <li>
+                  <strong>Updated Apps Script Code:</strong> Your Google Apps Script webhook (<code className="bg-white px-1 py-0.5 rounded font-mono text-[10px] border border-amber-300">Code.gs</code>) must have the <code className="bg-white px-1 py-0.5 rounded font-mono text-[10px] border border-amber-300">create_user</code> action handler (available to copy below).
+                </li>
+              </ol>
             </div>
 
             {/* Quick Copy Headers Box */}
